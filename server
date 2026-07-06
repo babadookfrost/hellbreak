@@ -1,0 +1,307 @@
+const WebSocket = require('ws');
+const http = require('http');
+
+const PORT = process.env.PORT || 3000;
+
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Hellbreak Server');
+});
+
+const wss = new WebSocket.Server({ server });
+
+const COLORS = ['#00aaff', '#ff4444', '#44ff44', '#ffaa00', '#ff44ff', '#44ffff', '#ffff44', '#ff8844', '#8844ff', '#44ff88'];
+
+function dist(x1, y1, x2, y2) { return Math.sqrt((x2-x1)**2 + (y2-y1)**2); }
+
+const UPGRADES = [
+    () => ({ dmg: 1.3, desc: '+30% урона' }),
+    () => ({ spd: 1.15, desc: '+15% скорости' }),
+    () => ({ atkSpd: 0.8, desc: '+20% атаки' }),
+    () => ({ hp: 30, desc: '+30 HP' }),
+    () => ({ pierce: 1, desc: '+1 пробивание' }),
+    () => ({ magnet: 1.5, desc: '+50% радиус сбора' })
+];
+
+class Room {
+    constructor(name) {
+        this.name = name;
+        this.players = new Map();
+        this.enemies = [];
+        this.projectiles = [];
+        this.gems = [];
+        this.time = 0;
+        this.kills = 0;
+        this.spawnTimer = 0;
+        this.difficultyMultiplier = 1;
+        this.nextId = 0;
+        this.aliveCount = 0;
+        this.interval = null;
+    }
+
+    addPlayer(ws, name) {
+        const id = this.nextId++;
+        const color = COLORS[this.players.size % COLORS.length];
+        const player = {
+            id, name, color, ws,
+            x: 0, y: 0, radius: 15, speed: 250,
+            hp: 100, maxHp: 100,
+            level: 1, xp: 0, xpNeeded: 50,
+            weaponDelay: 0.8, weaponTimer: 0,
+            damage: 10, projSpeed: 600, pierce: 1, pickupRadius: 60,
+            keys: { w: false, a: false, s: false, d: false },
+            alive: true
+        };
+        this.players.set(id, player);
+        this.aliveCount++;
+        
+        if (this.players.size === 1) this.start();
+        
+        ws.on('message', (data) => {
+            try {
+                const msg = JSON.parse(data);
+                if (msg.type === 'input' && player.alive) {
+                    player.keys = msg.keys;
+                }
+            } catch(e) {}
+        });
+
+        ws.on('close', () => {
+            this.players.delete(id);
+            this.aliveCount--;
+            if (this.aliveCount <= 0) this.stop();
+        });
+
+        ws.send(JSON.stringify({ type: 'init', id, color }));
+        this.broadcast({ type: 'join', id, name, color });
+        return player;
+    }
+
+    start() {
+        console.log(`Room ${this.name} started`);
+        this.interval = setInterval(() => this.tick(), 50);
+    }
+
+    stop() {
+        if (this.interval) clearInterval(this.interval);
+        console.log(`Room ${this.name} stopped`);
+    }
+
+    tick() {
+        const dt = 0.05;
+
+        // --- Players move & shoot ---
+        for (const p of this.players.values()) {
+            if (!p.alive) continue;
+            let dx = 0, dy = 0;
+            if (p.keys.w) dy -= 1; if (p.keys.s) dy += 1;
+            if (p.keys.a) dx -= 1; if (p.keys.d) dx += 1;
+            if (dx !== 0 || dy !== 0) {
+                const len = Math.sqrt(dx*dx + dy*dy);
+                p.x += (dx/len) * p.speed * dt;
+                p.y += (dy/len) * p.speed * dt;
+            }
+
+            p.weaponTimer += dt;
+            if (p.weaponTimer >= p.weaponDelay && this.enemies.length > 0) {
+                let target = null, minDist = Infinity;
+                for (const e of this.enemies) {
+                    const d = dist(p.x, p.y, e.x, e.y);
+                    if (d < minDist) { minDist = d; target = e; }
+                }
+                if (target) {
+                    const angle = Math.atan2(target.y - p.y, target.x - p.x);
+                    this.projectiles.push({
+                        x: p.x, y: p.y, vx: Math.cos(angle)*p.projSpeed, vy: Math.sin(angle)*p.projSpeed,
+                        damage: p.damage, pierce: p.pierce, life: 2, radius: 4, hitEnemies: new Set()
+                    });
+                }
+                p.weaponTimer = 0;
+            }
+        }
+
+        // --- Projectiles ---
+        for (let i = this.projectiles.length-1; i >= 0; i--) {
+            const pr = this.projectiles[i];
+            pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.life -= dt;
+            if (pr.life <= 0) { this.projectiles.splice(i,1); continue; }
+            let destroyed = false;
+            for (let j = this.enemies.length-1; j >= 0; j--) {
+                const e = this.enemies[j];
+                if (pr.hitEnemies.has(e) || dist(pr.x,pr.y,e.x,e.y) >= pr.radius+e.radius) continue;
+                pr.hitEnemies.add(e);
+                e.hp -= pr.damage;
+                if (e.hp <= 0) {
+                    this.gems.push({x:e.x, y:e.y, xp:e.xp, radius:4});
+                    this.enemies.splice(j,1);
+                    this.kills++;
+                }
+                if (pr.hitEnemies.size >= pr.pierce) { destroyed = true; break; }
+            }
+            if (destroyed) this.projectiles.splice(i,1);
+        }
+
+        // --- Enemies move towards nearest player ---
+        for (let i = this.enemies.length-1; i >= 0; i--) {
+            const e = this.enemies[i];
+            let nearest = null, minDist = Infinity;
+            for (const p of this.players.values()) {
+                if (!p.alive) continue;
+                const d = dist(e.x, e.y, p.x, p.y);
+                if (d < minDist) { minDist = d; nearest = p; }
+            }
+            if (!nearest) continue;
+            const angle = Math.atan2(nearest.y - e.y, nearest.x - e.x);
+            e.x += Math.cos(angle) * e.speed * dt;
+            e.y += Math.sin(angle) * e.speed * dt;
+            if (minDist < e.radius + nearest.radius) {
+                nearest.hp -= e.damage;
+                e.x -= Math.cos(angle)*30; e.y -= Math.sin(angle)*30;
+                if (nearest.hp <= 0) {
+                    nearest.hp = 0; nearest.alive = false;
+                    this.aliveCount--;
+                    this.broadcast({ type: 'playerDied', id: nearest.id });
+                    if (this.aliveCount <= 0) { this.broadcast({ type: 'gameOver' }); this.stop(); }
+                }
+            }
+        }
+
+        // --- Gems magnet ---
+        for (const g of this.gems) {
+            for (const p of this.players.values()) {
+                if (!p.alive) continue;
+                const d = dist(g.x,g.y,p.x,p.y);
+                if (d < p.pickupRadius) {
+                    const a = Math.atan2(p.y-g.y, p.x-g.x);
+                    g.x += Math.cos(a)*400*dt; g.y += Math.sin(a)*400*dt;
+                }
+            }
+        }
+
+        // --- Gem pickup ---
+        for (let i = this.gems.length-1; i >= 0; i--) {
+            const g = this.gems[i];
+            for (const p of this.players.values()) {
+                if (!p.alive) continue;
+                if (dist(g.x,g.y,p.x,p.y) < 15 + g.radius) {
+                    p.xp += g.xp;
+                    let upgraded = false;
+                    while (p.xp >= p.xpNeeded) {
+                        p.xp -= p.xpNeeded;
+                        p.level++;
+                        p.xpNeeded = Math.floor(p.xpNeeded * 1.5);
+                        const u = UPGRADES[Math.floor(Math.random()*UPGRADES.length)]();
+                        if (u.dmg) p.damage *= u.dmg;
+                        if (u.spd) p.speed *= u.spd;
+                        if (u.atkSpd) p.weaponDelay *= u.atkSpd;
+                        if (u.hp) { p.maxHp += u.hp; p.hp = Math.min(p.hp+u.hp, p.maxHp); }
+                        if (u.pierce) p.pierce += u.pierce;
+                        if (u.magnet) p.pickupRadius *= u.magnet;
+                        upgraded = true;
+                    }
+                    if (upgraded) p.ws.send(JSON.stringify({ type: 'levelUp', level: p.level }));
+                    this.gems.splice(i,1);
+                    break;
+                }
+            }
+        }
+
+        // --- Spawn ---
+        this.spawnTimer += dt;
+        const spawnRate = Math.max(0.1, 1 - (this.time/300));
+        if (this.spawnTimer >= spawnRate) {
+            this.spawnTimer = 0;
+            let cx=0, cy=0, cnt=0;
+            for (const p of this.players.values()) { if (p.alive) { cx+=p.x; cy+=p.y; cnt++; } }
+            if (cnt === 0) { cx=0; cy=0; cnt=1; } else { cx/=cnt; cy/=cnt; }
+            const a = Math.random()*Math.PI*2, r = 400;
+            const df = this.difficultyMultiplier;
+            const rnd = Math.random();
+            let type = 0;
+            if (rnd > 0.9) type = 2;
+            else if (rnd > 0.7) type = 1;
+            if (type === 0) this.enemies.push({ x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp:20*df, speed:100+df*10, radius:12, damage:10, xp:10, color:'#ff3300' });
+            else if (type === 1) this.enemies.push({ x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp:10*df, speed:220+df*15, radius:8, damage:5, xp:15, color:'#ffaa00' });
+            else this.enemies.push({ x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp:80*df, speed:60+df*5, radius:20, damage:25, xp:30, color:'#550000' });
+        }
+
+        this.time += dt;
+        this.difficultyMultiplier = 1 + (this.time/60);
+        this.broadcastState();
+    }
+
+    broadcastState() {
+        const playersArr = [];
+        for (const p of this.players.values()) {
+            playersArr.push({
+                id: p.id, name: p.name, color: p.color,
+                x: Math.round(p.x), y: Math.round(p.y),
+                hp: Math.round(p.hp), maxHp: p.maxHp,
+                level: p.level, alive: p.alive
+            });
+        }
+        const enemiesArr = this.enemies.map(e => ({
+            x: Math.round(e.x), y: Math.round(e.y),
+            hp: Math.round(e.hp), maxHp: e.maxHp || Math.round(e.hp),
+            radius: e.radius, color: e.color, type: e.type
+        }));
+        const projArr = this.projectiles.map(p => ({
+            x: Math.round(p.x), y: Math.round(p.y), radius: p.radius
+        }));
+        const gemsArr = this.gems.map(g => ({ x: Math.round(g.x), y: Math.round(g.y) }));
+
+        const state = {
+            type: 'state',
+            players: playersArr,
+            enemies: enemiesArr,
+            projectiles: projArr,
+            gems: gemsArr,
+            time: Math.round(this.time),
+            kills: this.kills,
+            aliveCount: this.aliveCount
+        };
+        this.broadcast(state);
+    }
+
+    broadcast(msg) {
+        const data = JSON.stringify(msg);
+        for (const p of this.players.values()) {
+            if (p.ws.readyState === WebSocket.OPEN) p.ws.send(data);
+        }
+    }
+}
+
+const rooms = new Map();
+
+wss.on('connection', (ws) => {
+    let player = null;
+    let room = null;
+
+    ws.on('message', (data) => {
+        try {
+            const msg = JSON.parse(data);
+            if (msg.type === 'join') {
+                const roomName = msg.room || 'default';
+                if (!rooms.has(roomName)) rooms.set(roomName, new Room(roomName));
+                room = rooms.get(roomName);
+                if (room.players.size >= 10) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Комната полна (макс. 10)' }));
+                    return;
+                }
+                player = room.addPlayer(ws, msg.name || 'Player');
+            }
+        } catch(e) {}
+    });
+
+    ws.on('close', () => {
+        if (room && player) {
+            room.players.delete(player.id);
+            room.aliveCount--;
+            room.broadcast({ type: 'leave', id: player.id });
+            if (room.aliveCount <= 0) room.stop();
+            if (room.players.size === 0) rooms.delete(room.name);
+        }
+    });
+});
+
+server.listen(PORT, () => console.log(`Hellbreak server on port ${PORT}`));
