@@ -8,38 +8,48 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0b0000; color: #fff; font-family: 'Courier New', Courier, monospace; overflow: hidden; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
-        .overlay { position: absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; background:rgba(11,0,0,0.85); z-index:10; }
-        h1 { font-size:4rem; color:#ff3300; text-shadow:0 0 10px #f00; text-transform:uppercase; }
-        h2 { font-size:1.5rem; color:#ffaa00; margin-bottom:20px; }
-        input { padding:12px; font-size:1.2rem; background:#220000; color:#fff; border:2px solid #ff5500; font-family:inherit; margin:5px; width:300px; text-align:center; }
-        input::placeholder { color:#663333; }
-        button { padding:15px 30px; font-size:1.5rem; background:#660000; color:#fff; border:2px solid #ff3300; cursor:pointer; font-family:inherit; text-transform:uppercase; margin:5px; }
-        button:hover { background:#ff3300; box-shadow:0 0 15px #f30; }
-        button:disabled { opacity:0.5; cursor:not-allowed; }
-        #hud { position:absolute; top:10px; left:20px; z-index:5; pointer-events:none; }
-        #hud-right { position:absolute; top:10px; right:20px; z-index:5; pointer-events:none; text-align:right; }
-        .bar-container { width:300px; height:16px; background:#330000; border:2px solid #550000; margin-bottom:5px; }
-        #hp-bar { width:100%; height:100%; background:#ff0000; transition:width 0.1s; }
-        #xp-bar { width:0%; height:100%; background:#0088ff; transition:width 0.1s; }
-        .stat-text { font-size:1rem; margin:2px 0; color:#ddd; font-weight:bold; }
-        .damage-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,0,0,0.3); z-index:4; opacity:0; pointer-events:none; transition:opacity 0.1s; }
+        .overlay { position: absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; background:rgba(11,0,0,0.88); z-index:10; }
+        h1 { font-size:4rem; color:#ff3300; text-shadow:0 0 20px #f00; text-transform:uppercase; letter-spacing:4px; }
+        h2 { font-size:1.6rem; color:#ffaa00; margin-bottom:8px; }
+        .subtitle { color:#aa6666; margin-bottom:25px; font-size:0.95rem; }
+        input { padding:12px 16px; font-size:1.1rem; background:#1a0000; color:#fff; border:2px solid #ff5500; font-family:inherit; margin:6px; width:320px; text-align:center; border-radius:4px; outline:none; }
+        input:focus { border-color:#ff3300; box-shadow:0 0 10px rgba(255,51,0,0.3); }
+        input::placeholder { color:#553333; }
+        button { padding:14px 40px; font-size:1.3rem; background:#660000; color:#fff; border:2px solid #ff3300; cursor:pointer; font-family:inherit; text-transform:uppercase; margin:10px; border-radius:4px; transition:0.2s; letter-spacing:2px; }
+        button:hover { background:#ff3300; box-shadow:0 0 20px #f30; }
+        button:disabled { opacity:0.4; cursor:not-allowed; box-shadow:none; }
+        #hud { position:absolute; top:12px; left:20px; z-index:5; pointer-events:none; }
+        #hud-right { position:absolute; top:12px; right:20px; z-index:5; pointer-events:none; text-align:right; }
+        .bar-container { width:280px; height:14px; background:#2a0000; border:2px solid #550000; margin-bottom:6px; border-radius:3px; overflow:hidden; }
+        #hp-bar { width:100%; height:100%; background:#ff0000; transition:width 0.08s; }
+        #xp-bar { width:0%; height:100%; background:#0088ff; transition:width 0.08s; }
+        .stat-text { font-size:0.95rem; margin:3px 0; color:#ddd; font-weight:bold; letter-spacing:0.5px; }
+        .damage-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,0,0,0.25); z-index:4; opacity:0; pointer-events:none; transition:opacity 0.08s; }
         .hidden { display:none!important; }
-        #connectionStatus { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:5; padding:5px 15px; border-radius:5px; font-size:0.9rem; background:rgba(0,0,0,0.7); pointer-events:none; }
-        .player-label { position:absolute; z-index:3; pointer-events:none; font-size:0.8rem; text-shadow:0 0 5px #000; text-align:center; }
-        #toast { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:6; font-size:2rem; color:#ffaa00; text-shadow:0 0 10px #f80; opacity:0; transition:opacity 0.3s; pointer-events:none; }
+        #conn-status { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:5; padding:6px 18px; border-radius:6px; font-size:0.85rem; background:rgba(0,0,0,0.75); pointer-events:none; border:1px solid #333; }
+        #toast { position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); z-index:6; font-size:1.8rem; color:#ffaa00; text-shadow:0 0 15px #f80; opacity:0; transition:opacity 0.2s; pointer-events:none; text-align:center; background:rgba(0,0,0,0.5); padding:12px 24px; border-radius:8px; border:1px solid rgba(255,170,0,0.3); }
+        #connect-error { color:#ff4444; margin-top:10px; font-size:0.9rem; display:none; max-width:400px; text-align:center; }
+        .players-count { color:#888; margin-top:5px; font-size:0.85rem; }
     </style>
 </head>
 <body>
+
+    <!-- Главное меню -->
     <div id="mainMenu" class="overlay">
         <h1>HELLBREAK</h1>
-        <h2>Кооператив до 10 человек</h2>
+        <h2>Адский кооператив</h2>
+        <p class="subtitle">Выживай вместе с друзьями — или сгори в аду</p>
+
         <input id="nameInput" type="text" placeholder="Твоё имя" maxlength="12" value="Воин">
         <input id="roomInput" type="text" placeholder="Название комнаты" maxlength="20" value="hell">
         <input id="serverInput" type="text" placeholder="ws://сервер:порт" value="ws://localhost:3000">
-        <button id="connectBtn" onclick="connect()">Подключиться</button>
-        <p id="connectError" style="color:#f44; margin-top:10px; display:none;"></p>
+
+        <button id="connectBtn" onclick="connect()">Войти в ад</button>
+        <p id="connect-error"></p>
+        <p class="players-count">👥 до 10 человек • кооператив</p>
     </div>
 
+    <!-- HUD слева -->
     <div id="hud" class="hidden">
         <div class="stat-text">❤️ <span id="hp-val">100</span> / <span id="hp-max">100</span></div>
         <div class="bar-container"><div id="hp-bar"></div></div>
@@ -48,78 +58,134 @@
         <div class="bar-container"><div id="xp-bar"></div></div>
         <div class="stat-text">💀 УБИТО: <span id="kills-val">0</span></div>
     </div>
+
+    <!-- HUD справа -->
     <div id="hud-right" class="hidden">
         <div class="stat-text">⏱ <span id="time-val">00:00</span></div>
         <div class="stat-text">👥 <span id="alive-val">0</span>/10</div>
     </div>
 
+    <!-- Game Over -->
     <div id="gameOverMenu" class="overlay hidden">
-        <h1>ВСЕ УМЕРЛИ</h1>
-        <h2 id="finalStats">Ад победил.</h2>
+        <h1>АД ПОБЕДИЛ</h1>
+        <h2 id="finalStats">Все пали в бою.</h2>
         <button onclick="location.reload()">Выйти</button>
     </div>
 
+    <!-- Эффекты -->
     <div id="damageOverlay" class="damage-overlay"></div>
-    <div id="connectionStatus">Отключён</div>
+    <div id="conn-status">⏳ Ожидание подключения...</div>
     <div id="toast"></div>
+
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
 
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // ---------- СОСТОЯНИЕ ----------
         let ws = null;
         let myId = null;
         let myColor = '#00aaff';
-        let gameState = { players: [], enemies: [], projectiles: [], gems: [], time: 0, kills: 0, aliveCount: 0 };
+        let gameState = {
+            players: [],
+            enemies: [],
+            projectiles: [],
+            gems: [],
+            time: 0,
+            kills: 0,
+            aliveCount: 0
+        };
         let connected = false;
-        let keys = { w: false, a: false, s: false, d: false };
         let inputInterval = null;
-        let lastDamageFlash = 0;
 
-        const keysMap = { 'w': 'w', 'a': 'a', 's': 's', 'd': 'd', 'ц': 'w', 'ф': 'a', 'ы': 's', 'в': 'd' };
-        window.addEventListener('keydown', e => { const k = keysMap[e.key.toLowerCase()]; if (k) { keys[k] = true; e.preventDefault(); } });
-        window.addEventListener('keyup', e => { const k = keysMap[e.key.toLowerCase()]; if (k) { keys[k] = false; e.preventDefault(); } });
+        const keys = { w: false, a: false, s: false, d: false };
+        const KEY_MAP = {
+            'w': 'w', 'a': 'a', 's': 's', 'd': 'd',
+            'ц': 'w', 'ф': 'a', 'ы': 's', 'в': 'd',
+            'ArrowUp': 'w', 'ArrowDown': 's',
+            'ArrowLeft': 'a', 'ArrowRight': 'd'
+        };
 
+        window.addEventListener('keydown', e => {
+            const k = KEY_MAP[e.key];
+            if (k) { keys[k] = true; e.preventDefault(); }
+        });
+        window.addEventListener('keyup', e => {
+            const k = KEY_MAP[e.key];
+            if (k) { keys[k] = false; e.preventDefault(); }
+        });
+
+        // ---------- ВСПОМОГАТЕЛЬНЫЕ ----------
         function setStatus(text, color) {
-            const el = document.getElementById('connectionStatus');
-            el.textContent = text; el.style.color = color || '#aaa';
+            const el = document.getElementById('conn-status');
+            el.textContent = text;
+            el.style.color = color || '#aaa';
         }
 
         function showToast(text) {
             const el = document.getElementById('toast');
-            el.textContent = text; el.style.opacity = 1;
-            setTimeout(() => el.style.opacity = 0, 2000);
+            el.textContent = text;
+            el.style.opacity = '1';
+            setTimeout(() => { el.style.opacity = '0'; }, 2200);
         }
 
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+        }
+
+        function updateHUD() {
+            const me = gameState.players.find(p => p.id === myId);
+            if (me) {
+                document.getElementById('hp-val').textContent = Math.ceil(me.hp);
+                document.getElementById('hp-max').textContent = me.maxHp;
+                document.getElementById('hp-bar').style.width = (me.hp / me.maxHp * 100) + '%';
+                document.getElementById('lvl-val').textContent = me.level;
+                document.getElementById('xp-bar').style.width = (me.xp / me.xpNeeded * 100) + '%';
+            }
+            document.getElementById('time-val').textContent = formatTime(gameState.time);
+            document.getElementById('kills-val').textContent = gameState.kills;
+            document.getElementById('alive-val').textContent = gameState.aliveCount;
+        }
+
+        // ---------- ПОДКЛЮЧЕНИЕ ----------
         function connect() {
             const serverUrl = document.getElementById('serverInput').value.trim();
             const name = document.getElementById('nameInput').value.trim() || 'Воин';
             const room = document.getElementById('roomInput').value.trim() || 'hell';
 
-            document.getElementById('connectError').style.display = 'none';
+            const errorEl = document.getElementById('connect-error');
+            errorEl.style.display = 'none';
             document.getElementById('connectBtn').disabled = true;
 
             try {
                 ws = new WebSocket(serverUrl);
-            } catch(e) {
-                document.getElementById('connectError').textContent = 'Неверный URL';
-                document.getElementById('connectError').style.display = 'block';
+            } catch (e) {
+                errorEl.textContent = '❌ Неверный адрес сервера';
+                errorEl.style.display = 'block';
                 document.getElementById('connectBtn').disabled = false;
                 return;
             }
 
             ws.onopen = () => {
-                setStatus('Подключён', '#0f0');
+                setStatus('✅ Подключено к аду', '#44ff44');
                 ws.send(JSON.stringify({ type: 'join', name, room }));
+
                 document.getElementById('mainMenu').classList.add('hidden');
                 document.getElementById('hud').classList.remove('hidden');
                 document.getElementById('hud-right').classList.remove('hidden');
                 connected = true;
 
+                // Отправляем нажатия клавиш 20 раз в сек
                 inputInterval = setInterval(() => {
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({ type: 'input', keys }));
@@ -130,75 +196,75 @@
             ws.onmessage = (event) => {
                 try {
                     const msg = JSON.parse(event.data);
-                    
-                    if (msg.type === 'init') {
-                        myId = msg.id;
-                        myColor = msg.color;
-                        document.getElementById('hp-bar').style.background = myColor;
+
+                    switch (msg.type) {
+                        case 'init':
+                            myId = msg.id;
+                            myColor = msg.color;
+                            document.getElementById('hp-bar').style.background = myColor;
+                            break;
+
+                        case 'state':
+                            gameState = msg;
+                            break;
+
+                        case 'levelUp':
+                            showToast(`⭐ Уровень ${msg.level}!`);
+                            break;
+
+                        case 'playerDied':
+                            if (msg.id === myId) {
+                                showToast('💀 Ты погиб в аду...');
+                                // Красная вспышка
+                                const overlay = document.getElementById('damageOverlay');
+                                overlay.style.opacity = '0.8';
+                                setTimeout(() => { overlay.style.opacity = '0'; }, 400);
+                            } else {
+                                showToast(`💀 ${msg.name} пал в бою`);
+                            }
+                            break;
+
+                        case 'gameOver':
+                            document.getElementById('gameOverMenu').classList.remove('hidden');
+                            document.getElementById('finalStats').innerHTML =
+                                `Продержались: ${formatTime(msg.time)}<br>Убито демонов: ${msg.kills}`;
+                            break;
+
+                        case 'error':
+                            errorEl.textContent = '❌ ' + msg.message;
+                            errorEl.style.display = 'block';
+                            document.getElementById('connectBtn').disabled = false;
+                            ws.close();
+                            break;
                     }
-                    else if (msg.type === 'state') {
-                        gameState = msg;
-                    }
-                    else if (msg.type === 'levelUp') {
-                        showToast(`⭐ Уровень ${msg.level}!`);
-                    }
-                    else if (msg.type === 'playerDied') {
-                        if (msg.id === myId) showToast('💀 Ты умер!');
-                    }
-                    else if (msg.type === 'gameOver') {
-                        document.getElementById('gameOverMenu').classList.remove('hidden');
-                        document.getElementById('finalStats').textContent = `Продержались: ${formatTime(gameState.time)} | Убито: ${gameState.kills}`;
-                    }
-                    else if (msg.type === 'error') {
-                        document.getElementById('connectError').textContent = msg.message;
-                        document.getElementById('connectError').style.display = 'block';
-                        document.getElementById('connectBtn').disabled = false;
-                        ws.close();
-                    }
-                } catch(e) {}
+                } catch (e) { /* ignore */ }
             };
 
             ws.onerror = () => {
-                document.getElementById('connectError').textContent = 'Ошибка подключения';
-                document.getElementById('connectError').style.display = 'block';
+                errorEl.textContent = '❌ Ошибка подключения — сервер не отвечает';
+                errorEl.style.display = 'block';
                 document.getElementById('connectBtn').disabled = false;
-                setStatus('Ошибка', '#f44');
+                setStatus('❌ Ошибка', '#ff4444');
             };
 
             ws.onclose = () => {
-                setStatus('Отключён', '#f44');
+                setStatus('❌ Отключён от сервера', '#ff4444');
                 connected = false;
                 if (inputInterval) clearInterval(inputInterval);
                 document.getElementById('connectBtn').disabled = false;
             };
         }
 
-        function formatTime(sec) {
-            const m = Math.floor(sec / 60);
-            const s = Math.floor(sec % 60);
-            return (m < 10 ? '0'+m : m) + ':' + (s < 10 ? '0'+s : s);
-        }
-
-        function updateHUD() {
-            const me = gameState.players.find(p => p.id === myId);
-            if (me) {
-                document.getElementById('hp-val').textContent = me.hp;
-                document.getElementById('hp-max').textContent = me.maxHp;
-                document.getElementById('hp-bar').style.width = (me.hp / me.maxHp * 100) + '%';
-                document.getElementById('lvl-val').textContent = me.level;
-            }
-            document.getElementById('time-val').textContent = formatTime(gameState.time);
-            document.getElementById('kills-val').textContent = gameState.kills;
-            document.getElementById('alive-val').textContent = gameState.aliveCount;
-        }
-
-        // Game loop (render only!)
+        // ---------- РЕНДЕРИНГ ----------
         function render() {
             ctx.fillStyle = '#0b0000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const me = gameState.players.find(p => p.id === myId);
-            if (!me) { requestAnimationFrame(render); return; }
+            if (!me) {
+                requestAnimationFrame(render);
+                return;
+            }
 
             const camX = me.x - canvas.width / 2;
             const camY = me.y - canvas.height / 2;
@@ -206,64 +272,111 @@
             ctx.save();
             ctx.translate(-camX, -camY);
 
-            // Grid
-            ctx.strokeStyle = 'rgba(255,0,0,0.05)';
+            // ------ Сетка ада ------
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.04)';
             ctx.lineWidth = 1;
-            const gs = 100;
-            const sx = Math.floor(camX/gs)*gs, sy = Math.floor(camY/gs)*gs;
-            for(let x=sx; x<sx+canvas.width+gs; x+=gs) { ctx.beginPath(); ctx.moveTo(x,camY); ctx.lineTo(x,camY+canvas.height); ctx.stroke(); }
-            for(let y=sy; y<sy+canvas.height+gs; y+=gs) { ctx.beginPath(); ctx.moveTo(camX,y); ctx.lineTo(camX+canvas.width,y); ctx.stroke(); }
-
-            // Gems
-            for (const g of gameState.gems) {
-                ctx.beginPath(); ctx.arc(g.x, g.y, 4, 0, Math.PI*2);
-                ctx.fillStyle = '#00aaff'; ctx.fill();
+            const gs = 80;
+            const sx = Math.floor(camX / gs) * gs;
+            const sy = Math.floor(camY / gs) * gs;
+            for (let x = sx; x < camX + canvas.width + gs; x += gs) {
+                ctx.beginPath();
+                ctx.moveTo(x, camY);
+                ctx.lineTo(x, camY + canvas.height);
+                ctx.stroke();
+            }
+            for (let y = sy; y < camY + canvas.height + gs; y += gs) {
+                ctx.beginPath();
+                ctx.moveTo(camX, y);
+                ctx.lineTo(camX + canvas.width, y);
+                ctx.stroke();
             }
 
-            // Enemies
+            // ------ Кристаллы опыта ------
+            for (const g of gameState.gems) {
+                ctx.beginPath();
+                ctx.arc(g.x, g.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#00aaff';
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#00aaff';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // ------ Снаряды ------
+            for (const p of gameState.projectiles) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#ffffff';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // ------ Враги ------
             for (const e of gameState.enemies) {
-                ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
-                ctx.fillStyle = e.color; ctx.fill();
-                // HP bar for enemies
+                // Тело
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+                ctx.fillStyle = e.color;
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = e.color;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // HP бар врага
                 if (e.hp < e.maxHp) {
-                    const bw = e.radius * 2;
-                    ctx.fillStyle = '#330000';
-                    ctx.fillRect(e.x-bw/2, e.y-e.radius-8, bw, 4);
-                    ctx.fillStyle = '#ff0000';
-                    ctx.fillRect(e.x-bw/2, e.y-e.radius-8, bw * (e.hp/e.maxHp), 4);
+                    const bw = e.radius * 2.4;
+                    const bh = 4;
+                    const by = e.y - e.radius - 10;
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.fillRect(e.x - bw / 2, by, bw, bh);
+                    ctx.fillStyle = e.hp / e.maxHp > 0.5 ? '#ff4444' :
+                                    e.hp / e.maxHp > 0.25 ? '#ff8800' : '#ff0000';
+                    ctx.fillRect(e.x - bw / 2, by, bw * (e.hp / e.maxHp), bh);
                 }
             }
 
-            // Projectiles
-            for (const p of gameState.projectiles) {
-                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
-                ctx.fillStyle = '#fff';
-                ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
-                ctx.fill(); ctx.shadowBlur = 0;
-            }
-
-            // Players
+            // ------ Игроки ------
             for (const p of gameState.players) {
-                ctx.beginPath(); ctx.arc(p.x, p.y, 15, 0, Math.PI*2);
+                if (!p.alive) continue;
+
+                // Подсветка для своего игрока
+                const isMe = p.id === myId;
+
+                // Тело
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
                 ctx.fillStyle = p.color;
-                ctx.shadowBlur = p.id === myId ? 15 : 5;
+                ctx.shadowBlur = isMe ? 20 : 8;
                 ctx.shadowColor = p.color;
                 ctx.fill();
                 ctx.shadowBlur = 0;
-                // Name
-                ctx.fillStyle = '#fff';
-                ctx.font = '12px Courier New';
+
+                // Имя
+                ctx.fillStyle = isMe ? '#ffffff' : 'rgba(255,255,255,0.8)';
+                ctx.font = isMe ? 'bold 13px Courier New' : '12px Courier New';
                 ctx.textAlign = 'center';
-                ctx.fillText(p.name, p.x, p.y - 25);
-                // HP bar
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = '#000000';
+                ctx.fillText(p.name, p.x, p.y - 28);
+                ctx.shadowBlur = 0;
+
+                // HP бар
                 const hpPct = p.hp / p.maxHp;
-                ctx.fillStyle = '#330000';
-                ctx.fillRect(p.x-15, p.y-28, 30, 4);
-                ctx.fillStyle = hpPct > 0.5 ? '#0f0' : hpPct > 0.25 ? '#ff0' : '#f00';
-                ctx.fillRect(p.x-15, p.y-28, 30 * hpPct, 4);
+                const bw = 30;
+                const bh = 4;
+                const by = p.y - 32;
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(p.x - bw / 2, by, bw, bh);
+                ctx.fillStyle = hpPct > 0.6 ? '#44ff44' :
+                                hpPct > 0.3 ? '#ffaa00' : '#ff2222';
+                ctx.fillRect(p.x - bw / 2, by, bw * hpPct, bh);
             }
 
             ctx.restore();
+
+            // Обновление HUD
             updateHUD();
             requestAnimationFrame(render);
         }
