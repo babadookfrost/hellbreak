@@ -14,15 +14,38 @@ const COLORS = ['#00aaff', '#ff4444', '#44ff44', '#ffaa00', '#ff44ff', '#44ffff'
 
 function dist(x1, y1, x2, y2) { return Math.sqrt((x2-x1)**2 + (y2-y1)**2); }
 
-const UPGRADES = [
-    () => ({ dmg: 1.3, desc: '+30% урона' }),
-    () => ({ spd: 1.15, desc: '+15% скорости' }),
-    () => ({ atkSpd: 0.8, desc: '+20% атаки' }),
-    () => ({ hp: 30, desc: '+30 HP' }),
-    () => ({ pierce: 1, desc: '+1 пробивание' }),
-    () => ({ magnet: 1.5, desc: '+50% радиус сбора' })
+// ========== ОРУЖИЯ ==========
+const WEAPONS = {
+    fireball: { name: 'Огненный шар', color: '#ff5500', dmg: 8, delay: 0.8, speed: 600, pierce: 1, radius: 5, evolve: 'inferno' },
+    ice:      { name: 'Ледяной осколок', color: '#00ccff', dmg: 6, delay: 1.0, speed: 450, pierce: 2, radius: 4, evolve: 'glacial' },
+    lightning:{ name: 'Цепь молнии', color: '#ffff00', dmg: 12, delay: 1.8, speed: 800, pierce: 1, radius: 3, evolve: 'thunder' },
+    void:     { name: 'Сфера пустоты', color: '#aa44ff', dmg: 15, delay: 2.5, speed: 200, pierce: 8, radius: 7, evolve: 'blackhole' },
+    holy:     { name: 'Святой свет', color: '#ffffee', dmg: 4, delay: 0.6, speed: 0, pierce: 99, radius: 55, evolve: 'divine', aura: true },
+    demon:    { name: 'Удар демона', color: '#ff0044', dmg: 25, delay: 1.4, speed: 500, pierce: 2, radius: 6, evolve: 'hellfire' }
+};
+
+const EVOLUTIONS = {
+    inferno:   { ...WEAPONS.fireball, name: 'Инферно', color: '#ff2200', radius: 9, dmg: 30, aoe: 80, delay: 1.0 },
+    glacial:   { ...WEAPONS.ice, name: 'Ледяная буря', color: '#88ffff', radius: 6, pierce: 6, dmg: 18, freeze: 3 },
+    thunder:   { ...WEAPONS.lightning, name: 'Гнев Тора', color: '#ffffff', dmg: 40, chain: 8 },
+    blackhole: { ...WEAPONS.void, name: 'Чёрная дыра', color: '#110033', radius: 14, dmg: 12, pull: 200 },
+    divine:    { ...WEAPONS.holy, name: 'Божественная кара', color: '#ffffff', radius: 110, dmg: 8, heal: 3 },
+    hellfire:  { ...WEAPONS.demon, name: 'Адское пламя', color: '#ff0055', dmg: 45, radius: 8, pool: true }
+};
+
+const WEAPON_KEYS = Object.keys(WEAPONS);
+
+// ========== ПАССИВКИ ==========
+const PASSIVES = [
+    () => ({ key: 'dmg', desc: '+30% урона', apply: p => p.damage *= 1.3 }),
+    () => ({ key: 'spd', desc: '+15% скорости бега', apply: p => p.speed *= 1.15 }),
+    () => ({ key: 'aspd', desc: '+20% скорости атаки', apply: p => p.attackSpeed *= 0.8 }),
+    () => ({ key: 'hp', desc: '+30 HP', apply: p => { p.maxHp += 30; p.hp = Math.min(p.hp + 30, p.maxHp); } }),
+    () => ({ key: 'pierce', desc: '+1 пробивание', apply: p => p.pierceBonus += 1 }),
+    () => ({ key: 'magnet', desc: '+50% радиус сбора', apply: p => p.pickupRadius *= 1.5 })
 ];
 
+// ========== КОМНАТА ==========
 class Room {
     constructor(name) {
         this.name = name;
@@ -30,6 +53,7 @@ class Room {
         this.enemies = [];
         this.projectiles = [];
         this.gems = [];
+        this.firepools = [];
         this.time = 0;
         this.kills = 0;
         this.spawnTimer = 0;
@@ -47,16 +71,16 @@ class Room {
             x: 0, y: 0, radius: 15, speed: 250,
             hp: 100, maxHp: 100,
             level: 1, xp: 0, xpNeeded: 50,
-            weaponDelay: 0.8, weaponTimer: 0,
-            damage: 10, projSpeed: 600, pierce: 1, pickupRadius: 60,
+            damage: 10, attackSpeed: 1, pierceBonus: 0, pickupRadius: 60,
+            weapons: [{ id: 'fireball', level: 1, timer: 0 }],
             keys: { w: false, a: false, s: false, d: false },
             alive: true
         };
         this.players.set(id, player);
         this.aliveCount++;
-        
+
         if (this.players.size === 1) this.start();
-        
+
         ws.on('message', (data) => {
             try {
                 const msg = JSON.parse(data);
@@ -67,9 +91,13 @@ class Room {
         });
 
         ws.on('close', () => {
-            this.players.delete(id);
-            this.aliveCount--;
-            if (this.aliveCount <= 0) this.stop();
+            if (this.players.has(id)) {
+                this.players.delete(id);
+                this.aliveCount--;
+                this.broadcast({ type: 'leave', id });
+                if (this.aliveCount <= 0) this.stop();
+                if (this.players.size === 0) rooms.delete(this.name);
+            }
         });
 
         ws.send(JSON.stringify({ type: 'init', id, color }));
@@ -78,21 +106,27 @@ class Room {
     }
 
     start() {
-        console.log(`Room ${this.name} started`);
+        console.log(`Room ${this.name} started (${this.players.size} players)`);
         this.interval = setInterval(() => this.tick(), 50);
     }
 
     stop() {
-        if (this.interval) clearInterval(this.interval);
+        if (this.interval) { clearInterval(this.interval); this.interval = null; }
         console.log(`Room ${this.name} stopped`);
+    }
+
+    getStats(weaponId, level) {
+        if (level >= 9 && EVOLUTIONS[weaponId]) return EVOLUTIONS[weaponId];
+        return WEAPONS[weaponId] || WEAPONS.fireball;
     }
 
     tick() {
         const dt = 0.05;
+        const alivePlayers = [...this.players.values()].filter(p => p.alive);
+        if (alivePlayers.length === 0) return;
 
-        // --- Players move & shoot ---
-        for (const p of this.players.values()) {
-            if (!p.alive) continue;
+        // --- ДВИЖЕНИЕ ИГРОКОВ ---
+        for (const p of alivePlayers) {
             let dx = 0, dy = 0;
             if (p.keys.w) dy -= 1; if (p.keys.s) dy += 1;
             if (p.keys.a) dx -= 1; if (p.keys.d) dx += 1;
@@ -102,206 +136,233 @@ class Room {
                 p.y += (dy/len) * p.speed * dt;
             }
 
-            p.weaponTimer += dt;
-            if (p.weaponTimer >= p.weaponDelay && this.enemies.length > 0) {
-                let target = null, minDist = Infinity;
-                for (const e of this.enemies) {
-                    const d = dist(p.x, p.y, e.x, e.y);
-                    if (d < minDist) { minDist = d; target = e; }
+            // --- СТРЕЛЬБА ИЗ ВСЕГО ОРУЖИЯ ---
+            for (const w of p.weapons) {
+                w.timer += dt;
+                const stats = this.getStats(w.id, w.level);
+                const delay = stats.delay * p.attackSpeed;
+
+                if (w.timer >= delay) {
+                    w.timer = 0;
+                    const pDmg = stats.dmg * (1 + (w.level-1) * 0.25) * (p.damage / 10);
+
+                    if (stats.aura) {
+                        // Аура — бьёт всех врагов в радиусе
+                        for (const e of this.enemies) {
+                            if (dist(p.x, p.y, e.x, e.y) < stats.radius) e.hp -= pDmg;
+                        }
+                        if (stats.heal) p.hp = Math.min(p.maxHp, p.hp + stats.heal);
+                        // Визуальный эффект
+                        this.projectiles.push(this.makeProj(p.x, p.y, 0, 0, 0, 99, 0.15, stats.radius, stats.color));
+                    } else {
+                        // Обычные снаряды — ищут цель
+                        let target = null, minDist = Infinity;
+                        for (const e of this.enemies) {
+                            const d = dist(p.x, p.y, e.x, e.y);
+                            if (d < minDist) { minDist = d; target = e; }
+                        }
+                        if (target) {
+                            const angle = Math.atan2(target.y - p.y, target.x - p.x);
+                            const pierce = stats.pierce + p.pierceBonus;
+                            this.projectiles.push(this.makeProj(
+                                p.x, p.y,
+                                Math.cos(angle) * stats.speed,
+                                Math.sin(angle) * stats.speed,
+                                pDmg, pierce, 2.5,
+                                stats.radius + Math.floor(w.level/2),
+                                stats.color,
+                                w.level >= 9 ? stats : null
+                            ));
+                        }
+                    }
                 }
-                if (target) {
-                    const angle = Math.atan2(target.y - p.y, target.x - p.x);
-                    this.projectiles.push({
-                        x: p.x, y: p.y, vx: Math.cos(angle)*p.projSpeed, vy: Math.sin(angle)*p.projSpeed,
-                        damage: p.damage, pierce: p.pierce, life: 2, radius: 4, hitEnemies: new Set()
-                    });
+            }
+
+            // Урон от огненных луж
+            for (const pool of this.firepools) {
+                if (dist(p.x, p.y, pool.x, pool.y) < 30) {
+                    p.hp -= pool.damage * dt;
+                    if (p.hp <= 0) { p.hp = 0; p.alive = false; this.aliveCount--; this.broadcast({ type: 'playerDied', id: p.id }); }
                 }
-                p.weaponTimer = 0;
             }
         }
 
-        // --- Projectiles ---
+        // --- СНАРЯДЫ ---
         for (let i = this.projectiles.length-1; i >= 0; i--) {
             const pr = this.projectiles[i];
-            pr.x += pr.vx * dt; pr.y += pr.vy * dt; pr.life -= dt;
+            pr.x += pr.vx * dt;
+            pr.y += pr.vy * dt;
+            pr.life -= dt;
             if (pr.life <= 0) { this.projectiles.splice(i,1); continue; }
+
+            if (pr.damage <= 0) continue; // чисто визуальные
+
             let destroyed = false;
             for (let j = this.enemies.length-1; j >= 0; j--) {
                 const e = this.enemies[j];
-                if (pr.hitEnemies.has(e) || dist(pr.x,pr.y,e.x,e.y) >= pr.radius+e.radius) continue;
+                if (pr.hitEnemies.has(e) || dist(pr.x, pr.y, e.x, e.y) >= pr.radius + e.radius) continue;
                 pr.hitEnemies.add(e);
                 e.hp -= pr.damage;
+
+                // ЭФФЕКТЫ ЭВОЛЮЦИЙ
+                if (pr.effect) {
+                    // Заморозка
+                    if (pr.effect.freeze) {
+                        e.speed = Math.max(20, (e.baseSpeed || e.speed) * 0.3);
+                        e.freezeTimer = pr.effect.freeze;
+                    }
+                    // Притяжение (чёрная дыра)
+                    if (pr.effect.pull) {
+                        const a = Math.atan2(pr.y - e.y, pr.x - e.x);
+                        e.x += Math.cos(a) * pr.effect.pull * dt;
+                        e.y += Math.sin(a) * pr.effect.pull * dt;
+                    }
+                    // AoE взрыв (инферно)
+                    if (pr.effect.aoe) {
+                        for (const ae of this.enemies) {
+                            if (ae !== e && dist(pr.x, pr.y, ae.x, ae.y) < pr.effect.aoe) {
+                                ae.hp -= pr.damage * 0.5;
+                            }
+                        }
+                        this.projectiles.push(this.makeProj(pr.x, pr.y, 0, 0, 0, 99, 0.2, pr.effect.aoe, 'rgba(255,60,0,0.3)'));
+                    }
+                    // Огненная лужа (хеллфайр)
+                    if (pr.effect.pool) {
+                        this.firepools.push({ x: pr.x, y: pr.y, damage: pr.damage * 0.3, timer: 3 });
+                    }
+                }
+
                 if (e.hp <= 0) {
-                    this.gems.push({x:e.x, y:e.y, xp:e.xp, radius:4});
-                    this.enemies.splice(j,1);
+                    this.gems.push({ x: e.x, y: e.y, xp: e.xp || 10, radius: 4 });
+                    this.enemies.splice(j, 1);
                     this.kills++;
                 }
                 if (pr.hitEnemies.size >= pr.pierce) { destroyed = true; break; }
             }
-            if (destroyed) this.projectiles.splice(i,1);
+            if (destroyed) this.projectiles.splice(i, 1);
         }
 
-        // --- Enemies move towards nearest player ---
+        // --- ОГНЕННЫЕ ЛУЖИ ---
+        for (let i = this.firepools.length-1; i >= 0; i--) {
+            const pool = this.firepools[i];
+            pool.timer -= dt;
+            for (const e of this.enemies) {
+                if (dist(pool.x, pool.y, e.x, e.y) < 30) {
+                    e.hp -= pool.damage * dt;
+                }
+            }
+            // Визуал для луж
+            this.projectiles.push(this.makeProj(pool.x, pool.y, 0, 0, 0, 99, 0.05, 30, 'rgba(255,0,80,0.2)'));
+            if (pool.timer <= 0) this.firepools.splice(i, 1);
+        }
+
+        // --- ВРАГИ ---
         for (let i = this.enemies.length-1; i >= 0; i--) {
             const e = this.enemies[i];
+
+            // Разморозка
+            if (e.freezeTimer) {
+                e.freezeTimer -= dt;
+                if (e.freezeTimer <= 0) e.speed = e.baseSpeed || e.speed;
+            }
+
+            // Поиск ближайшего игрока
             let nearest = null, minDist = Infinity;
-            for (const p of this.players.values()) {
-                if (!p.alive) continue;
+            for (const p of alivePlayers) {
                 const d = dist(e.x, e.y, p.x, p.y);
                 if (d < minDist) { minDist = d; nearest = p; }
             }
             if (!nearest) continue;
+
             const angle = Math.atan2(nearest.y - e.y, nearest.x - e.x);
             e.x += Math.cos(angle) * e.speed * dt;
             e.y += Math.sin(angle) * e.speed * dt;
+
             if (minDist < e.radius + nearest.radius) {
                 nearest.hp -= e.damage;
-                e.x -= Math.cos(angle)*30; e.y -= Math.sin(angle)*30;
+                e.x -= Math.cos(angle) * 30;
+                e.y -= Math.sin(angle) * 30;
                 if (nearest.hp <= 0) {
                     nearest.hp = 0; nearest.alive = false;
                     this.aliveCount--;
                     this.broadcast({ type: 'playerDied', id: nearest.id });
-                    if (this.aliveCount <= 0) { this.broadcast({ type: 'gameOver' }); this.stop(); }
+                    if (this.aliveCount <= 0) { this.broadcast({ type: 'gameOver' }); this.stop(); return; }
                 }
             }
         }
 
-        // --- Gems magnet ---
+        // --- КРИСТАЛЛЫ ---
         for (const g of this.gems) {
-            for (const p of this.players.values()) {
-                if (!p.alive) continue;
-                const d = dist(g.x,g.y,p.x,p.y);
+            for (const p of alivePlayers) {
+                const d = dist(g.x, g.y, p.x, p.y);
                 if (d < p.pickupRadius) {
-                    const a = Math.atan2(p.y-g.y, p.x-g.x);
-                    g.x += Math.cos(a)*400*dt; g.y += Math.sin(a)*400*dt;
+                    const a = Math.atan2(p.y - g.y, p.x - g.x);
+                    g.x += Math.cos(a) * 400 * dt;
+                    g.y += Math.sin(a) * 400 * dt;
                 }
             }
         }
 
-        // --- Gem pickup ---
         for (let i = this.gems.length-1; i >= 0; i--) {
             const g = this.gems[i];
-            for (const p of this.players.values()) {
-                if (!p.alive) continue;
-                if (dist(g.x,g.y,p.x,p.y) < 15 + g.radius) {
+            for (const p of alivePlayers) {
+                if (dist(g.x, g.y, p.x, p.y) < 15 + g.radius) {
                     p.xp += g.xp;
-                    let upgraded = false;
-                    while (p.xp >= p.xpNeeded) {
-                        p.xp -= p.xpNeeded;
-                        p.level++;
-                        p.xpNeeded = Math.floor(p.xpNeeded * 1.5);
-                        const u = UPGRADES[Math.floor(Math.random()*UPGRADES.length)]();
-                        if (u.dmg) p.damage *= u.dmg;
-                        if (u.spd) p.speed *= u.spd;
-                        if (u.atkSpd) p.weaponDelay *= u.atkSpd;
-                        if (u.hp) { p.maxHp += u.hp; p.hp = Math.min(p.hp+u.hp, p.maxHp); }
-                        if (u.pierce) p.pierce += u.pierce;
-                        if (u.magnet) p.pickupRadius *= u.magnet;
-                        upgraded = true;
-                    }
-                    if (upgraded) p.ws.send(JSON.stringify({ type: 'levelUp', level: p.level }));
-                    this.gems.splice(i,1);
+                    this.handleLevelUp(p);
+                    this.gems.splice(i, 1);
                     break;
                 }
             }
         }
 
-        // --- Spawn ---
+        // --- СПАВН ---
         this.spawnTimer += dt;
-        const spawnRate = Math.max(0.1, 1 - (this.time/300));
+        const spawnRate = Math.max(0.08, 0.8 - (this.time / 240));
         if (this.spawnTimer >= spawnRate) {
             this.spawnTimer = 0;
-            let cx=0, cy=0, cnt=0;
-            for (const p of this.players.values()) { if (p.alive) { cx+=p.x; cy+=p.y; cnt++; } }
-            if (cnt === 0) { cx=0; cy=0; cnt=1; } else { cx/=cnt; cy/=cnt; }
-            const a = Math.random()*Math.PI*2, r = 400;
+            let cx = 0, cy = 0, cnt = 0;
+            for (const p of alivePlayers) { cx += p.x; cy += p.y; cnt++; }
+            if (cnt === 0) { cx = 0; cy = 0; cnt = 1; } else { cx /= cnt; cy /= cnt; }
+
+            const a = Math.random() * Math.PI * 2;
+            const r = 400;
             const df = this.difficultyMultiplier;
             const rnd = Math.random();
             let type = 0;
             if (rnd > 0.9) type = 2;
             else if (rnd > 0.7) type = 1;
-            if (type === 0) this.enemies.push({ x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp:20*df, speed:100+df*10, radius:12, damage:10, xp:10, color:'#ff3300' });
-            else if (type === 1) this.enemies.push({ x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp:10*df, speed:220+df*15, radius:8, damage:5, xp:15, color:'#ffaa00' });
-            else this.enemies.push({ x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp:80*df, speed:60+df*5, radius:20, damage:25, xp:30, color:'#550000' });
+
+            let e;
+            if (type === 0) e = { x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp: 20*df, speed: 90+df*10, baseSpeed: 90+df*10, radius: 12, damage: 10, xp: 10, color: '#ff3300' };
+            else if (type === 1) e = { x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp: 10*df, speed: 200+df*15, baseSpeed: 200+df*15, radius: 8, damage: 5, xp: 15, color: '#ffaa00' };
+            else e = { x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r, hp: 80*df, speed: 55+df*5, baseSpeed: 55+df*5, radius: 20, damage: 25, xp: 30, color: '#550000' };
+            e.freezeTimer = 0;
+            this.enemies.push(e);
         }
 
         this.time += dt;
-        this.difficultyMultiplier = 1 + (this.time/60);
+        this.difficultyMultiplier = 1 + (this.time / 60);
         this.broadcastState();
     }
 
-    broadcastState() {
-        const playersArr = [];
-        for (const p of this.players.values()) {
-            playersArr.push({
-                id: p.id, name: p.name, color: p.color,
-                x: Math.round(p.x), y: Math.round(p.y),
-                hp: Math.round(p.hp), maxHp: p.maxHp,
-                level: p.level, alive: p.alive
-            });
-        }
-        const enemiesArr = this.enemies.map(e => ({
-            x: Math.round(e.x), y: Math.round(e.y),
-            hp: Math.round(e.hp), maxHp: e.maxHp || Math.round(e.hp),
-            radius: e.radius, color: e.color, type: e.type
-        }));
-        const projArr = this.projectiles.map(p => ({
-            x: Math.round(p.x), y: Math.round(p.y), radius: p.radius
-        }));
-        const gemsArr = this.gems.map(g => ({ x: Math.round(g.x), y: Math.round(g.y) }));
-
-        const state = {
-            type: 'state',
-            players: playersArr,
-            enemies: enemiesArr,
-            projectiles: projArr,
-            gems: gemsArr,
-            time: Math.round(this.time),
-            kills: this.kills,
-            aliveCount: this.aliveCount
-        };
-        this.broadcast(state);
+    makeProj(x, y, vx, vy, dmg, pierce, life, radius, color, effect) {
+        return { x, y, vx, vy, damage: dmg, pierce, life, radius, color, effect, hitEnemies: new Set() };
     }
 
-    broadcast(msg) {
-        const data = JSON.stringify(msg);
-        for (const p of this.players.values()) {
-            if (p.ws.readyState === WebSocket.OPEN) p.ws.send(data);
-        }
-    }
-}
+    handleLevelUp(p) {
+        let msg = '';
 
-const rooms = new Map();
+        const canEvolve = p.weapons.find(w => w.level >= 8 && EVOLUTIONS[w.id]);
+        const canAdd = p.weapons.length < 3;
+        const canUpgrade = p.weapons.some(w => w.level < 8);
 
-wss.on('connection', (ws) => {
-    let player = null;
-    let room = null;
+        const roll = Math.random();
 
-    ws.on('message', (data) => {
-        try {
-            const msg = JSON.parse(data);
-            if (msg.type === 'join') {
-                const roomName = msg.room || 'default';
-                if (!rooms.has(roomName)) rooms.set(roomName, new Room(roomName));
-                room = rooms.get(roomName);
-                if (room.players.size >= 10) {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Комната полна (макс. 10)' }));
-                    return;
-                }
-                player = room.addPlayer(ws, msg.name || 'Player');
-            }
-        } catch(e) {}
-    });
-
-    ws.on('close', () => {
-        if (room && player) {
-            room.players.delete(player.id);
-            room.aliveCount--;
-            room.broadcast({ type: 'leave', id: player.id });
-            if (room.aliveCount <= 0) room.stop();
-            if (room.players.size === 0) rooms.delete(room.name);
-        }
-    });
-});
-
-server.listen(PORT, () => console.log(`Hellbreak server on port ${PORT}`));
+        if (canEvolve && roll < 0.25) {
+            // ЭВОЛЮЦИЯ
+            const w = p.weapons.find(w => w.level >= 8 && EVOLUTIONS[w.id]);
+            const oldName = WEAPONS[w.id]?.name || w.id;
+            w.id = WEAPONS[w.id]?.evolve || w.id;
+            w.level = 9;
+            msg = `⚡ ЭВОЛЮЦИЯ: ${EVOLUTIONS[w.id]?.name || w.id}`;
+        } else if (canAdd &&
