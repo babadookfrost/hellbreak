@@ -34,7 +34,13 @@ canvas{display:block;background:var(--bg);cursor:crosshair;position:fixed;inset:
 
 .desktop-hints{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:rgba(26,26,26,0.35);font-size:11px;pointer-events:none;z-index:5;text-align:center;white-space:nowrap;}
 @media(pointer:coarse){.desktop-hints{display:none;}}
+
+@keyframes pulse {
+  from { box-shadow: 0 0 4px var(--blood); transform: scale(1); }
+  to { box-shadow: 0 0 14px var(--blood); transform: scale(1.05); }
+}
 </style>
+
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -43,6 +49,10 @@ canvas{display:block;background:var(--bg);cursor:crosshair;position:fixed;inset:
 <div class="btn btn-dash" id="btn-dash">D</div>
 <div class="btn btn-reload" id="btn-reload">R</div>
 </div>
+
+<div id="hud-inventory" style="position:fixed; top:40px; left:12px; display:flex; gap:6px; pointer-events:none; z-index:5;">
+</div>
+
 <div class="desktop-hints">WASD — движение · Мышь — прицел · ЛКМ — стрельба · R — перезарядка · SHIFT — рывок</div>
 <div class="name-entry" id="name-entry">
 <form id="name-form">
@@ -51,8 +61,92 @@ canvas{display:block;background:var(--bg);cursor:crosshair;position:fixed;inset:
 <button type="submit">OK</button>
 </form>
 </div>
+
+<div class="name-entry" id="loot-compare" style="display:none; flex-direction:column;">
+  <div style="background:#fff; border:2px solid var(--ind); padding:20px; border-radius:12px; max-width:90vw; width:450px; display:flex; flex-direction:column; gap:16px;">
+    <div class="name-entry-title">ИНВЕНТАРЬ ПОЛОН</div>
+    <div style="font-size:14px; text-align:center; color:#555;">Выберите предмет для замены</div>
+    <div id="loot-compare-slots" style="display:flex; justify-content:space-between; gap:8px;"></div>
+
+    <div style="display:flex; gap:16px; margin-top:10px;">
+      <div id="loot-compare-current" style="flex:1; border:1px solid #ccc; border-radius:6px; padding:12px; text-align:center;">
+        <div style="font-size:12px; color:#777; margin-bottom:8px;">ТЕКУЩИЙ</div>
+        <div id="lc-curr-icon" style="font-size:24px; margin-bottom:4px;"></div>
+        <div id="lc-curr-stats" style="font-size:12px; text-align:left;"></div>
+      </div>
+
+      <div id="loot-compare-new" style="flex:1; border:2px solid var(--ind); border-radius:6px; padding:12px; text-align:center; background:#faf8f4;">
+        <div style="font-size:12px; color:var(--ind); margin-bottom:8px; font-weight:bold;">НОВЫЙ</div>
+        <div id="lc-new-icon" style="font-size:24px; margin-bottom:4px;"></div>
+        <div id="lc-new-stats" style="font-size:12px; text-align:left;"></div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:10px;">
+      <button id="btn-loot-skip" style="flex:1; background:#999; color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;">ПРОПУСТИТЬ</button>
+      <button id="btn-loot-replace" style="flex:1; background:var(--ind); color:#1a1a1a; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;" disabled>ЗАМЕНИТЬ</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
+
+let lootReplaceIndex = -1;
+
+function updateLootCompareUI() {
+  const slotsContainer = document.getElementById('loot-compare-slots');
+  slotsContainer.innerHTML = '';
+  lootReplaceIndex = -1;
+  document.getElementById('btn-loot-replace').disabled = true;
+  document.getElementById('loot-compare-current').style.borderColor = '#ccc';
+  document.getElementById('lc-curr-icon').innerHTML = '?';
+  document.getElementById('lc-curr-stats').innerHTML = '-';
+
+  const newItem = Game.pendingLoot;
+  document.getElementById('loot-compare-new').style.borderColor = newItem.color;
+  document.getElementById('lc-new-icon').innerHTML = '<span style="color:'+newItem.color+'">' + newItem.icon + '</span><div style="font-size:12px; font-weight:bold; color:'+newItem.color+'">' + LOOT_RARITY[newItem.rarity].name + '</div>';
+  document.getElementById('lc-new-stats').innerHTML = '<div style="color:#10b981">+' + newItem.pos.text + '</div><div style="color:#d92638">-' + newItem.neg.text + '</div>';
+
+  for(let i=0; i<4; i++) {
+    const item = Game.inventory[i];
+    const slot = document.createElement('div');
+    slot.style.cssText = 'flex:1; aspect-ratio:1; border:2px solid ' + item.color + '; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; color:' + item.color + '; background:#fff;';
+    slot.innerHTML = item.icon;
+
+    slot.onclick = () => {
+      lootReplaceIndex = i;
+      Array.from(slotsContainer.children).forEach(c => c.style.background = '#fff');
+      slot.style.background = '#f0f0f0';
+
+      document.getElementById('loot-compare-current').style.borderColor = item.color;
+      document.getElementById('lc-curr-icon').innerHTML = '<span style="color:'+item.color+'">' + item.icon + '</span><div style="font-size:12px; font-weight:bold; color:'+item.color+'">' + LOOT_RARITY[item.rarity].name + '</div>';
+      document.getElementById('lc-curr-stats').innerHTML = '<div style="color:#10b981">+' + item.pos.text + '</div><div style="color:#d92638">-' + item.neg.text + '</div>';
+      document.getElementById('btn-loot-replace').disabled = false;
+    };
+    slotsContainer.appendChild(slot);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btn-loot-skip').onclick = () => {
+    document.getElementById('loot-compare').style.display = 'none';
+    Game.pendingLoot = null;
+    Game.state = 'play';
+  };
+  document.getElementById('btn-loot-replace').onclick = () => {
+    if (lootReplaceIndex >= 0 && lootReplaceIndex < 4) {
+      Game.inventory[lootReplaceIndex] = Game.pendingLoot;
+      Game.stats = Game.recalcStats();
+      spawnBanner(Game, {title: 'ПРЕДМЕТ ЭКИПИРОВАН', subtitle: '', color: Game.pendingLoot.color});
+      burst(Game, Game.player.x, Game.player.y, 30, Game.pendingLoot.color, 250);
+    }
+    document.getElementById('loot-compare').style.display = 'none';
+    Game.pendingLoot = null;
+    Game.state = 'play';
+  };
+});
+
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
@@ -68,6 +162,66 @@ function resize() {
 }
 
 const TILE=80,MAP_W=48,MAP_H=48,BLOCK=6,MAP_PX_W=MAP_W*TILE,MAP_PX_H=MAP_H*TILE;
+
+const LOOT_RARITY = {
+  common: { name: 'ОБЫЧНЫЙ', color: '#999', weight: 60, scale: 1 },
+  rare: { name: 'РЕДКИЙ', color: 'var(--cyan)', colorVal: '#0ea5c7', weight: 30, scale: 1.5 },
+  epic: { name: 'ЭПИЧЕСКИЙ', color: 'var(--ind)', colorVal: '#e8a317', weight: 9, scale: 2 },
+  legendary: { name: 'ЛЕГЕНДАРНЫЙ', color: 'var(--blood)', colorVal: '#d92638', weight: 1, scale: 3 }
+};
+
+const LOOT_ICONS = ['◆', '▲', '■', '●', '➤', '✹', '★', '✚', '⚡', '♦'];
+
+const AFFIXES_POS = [
+  { id: 'dmg', name: 'Урон', val: 0.2, text: '+X% урона оружия' },
+  { id: 'pierce', name: 'Пронзание', val: 1, text: '+X пронзания пуль', isInt: true },
+  { id: 'dash_cd', name: 'Рывок', val: -0.2, text: 'Кулдаун рывка X%' },
+  { id: 'speed', name: 'Скорость', val: 0.15, text: '+X% скор. передвижения' },
+  { id: 'slow_time', name: 'Заморозка', val: 0.5, text: 'Время X при ходьбе', isUnique: true },
+  { id: 'reload', name: 'Перезарядка', val: -0.25, text: 'Перезарядка быстрее на X%' },
+  { id: 'pickup', name: 'Радиус', val: 0.25, text: '+X% радиуса подбора' },
+  { id: 'ammo_save', name: 'Патроны', val: 0.1, text: 'X% шанс не тратить патрон' }
+];
+
+const AFFIXES_NEG = [
+  { id: 'hp_down', name: 'Хрупкость', val: -0.1, text: '-X% макс. HP' },
+  { id: 'speed_down', name: 'Тяжесть', val: -0.1, text: '-X% скор. передвижения' },
+  { id: 'ammo_down', name: 'Малоемкость', val: -1, text: '-X макс. патрон', isInt: true },
+  { id: 'dmg_taken', name: 'Уязвимость', val: 0.2, text: 'Входящий урон +X%' },
+  { id: 'reload_up', name: 'Медлительность', val: 0.25, text: 'Перезарядка +X%' },
+  { id: 'dmg_down', name: 'Слабость', val: -0.05, text: 'Урон -X%' }
+];
+
+function generateLootItem(forcedRarity) {
+  let rarityId = forcedRarity;
+  if (!rarityId) {
+    const r = Math.random() * 100;
+    let sum = 0;
+    for (const [id, data] of Object.entries(LOOT_RARITY)) {
+      sum += data.weight;
+      if (r <= sum) { rarityId = id; break; }
+    }
+    if(!rarityId) rarityId = 'common';
+  }
+
+  const rarity = LOOT_RARITY[rarityId];
+  const pos = AFFIXES_POS[Math.floor(Math.random() * AFFIXES_POS.length)];
+  let posVal = pos.val * rarity.scale;
+  if (pos.isInt) posVal = Math.max(1, Math.round(posVal));
+  if (pos.isUnique) posVal = pos.val;
+
+  const neg = AFFIXES_NEG[Math.floor(Math.random() * AFFIXES_NEG.length)];
+  let negVal = neg.val * rarity.scale;
+  if (neg.isInt) negVal = Math.round(negVal) || -1;
+
+  return {
+    icon: LOOT_ICONS[Math.floor(Math.random() * LOOT_ICONS.length)],
+    rarity: rarityId, color: rarity.colorVal,
+    pos: { id: pos.id, val: posVal, name: pos.name, text: pos.text.replace('X', pos.isUnique ? posVal : Math.abs(pos.isInt ? posVal : Math.round(posVal * 100))) },
+    neg: { id: neg.id, val: negVal, name: neg.name, text: neg.text.replace('X', Math.abs(neg.isInt ? negVal : Math.round(negVal * 100))) }
+  };
+}
+
 const WEAPON_POOL=['pistol','shotgun','smg','lmg','bow','rocket'];
 const WEAPONS={
   pistol:{id:'pistol',name:'Пистолет',icon:'◆',cd:0.28,pellets:3,spread:0.07,jitter:0.02,speed:1200,dmg:1,ammoMax:6,reload:1.3,pierce:1,auto:false},
@@ -167,16 +321,19 @@ function addEntry(l,e){const n=[...l,e].sort((a,b)=>b.score-a.score).slice(0,10)
 const isMobile='ontouchstart' in window||navigator.maxTouchPoints>0;
 const Input={keys:{},mouse:{x:0,y:0},stick:{active:false,dx:0,dy:0},fireReq:false,wantReload:false,wantDash:false,cmd:false,dashDirX:0,dashDirY:0};
 let stickTouchId=null,aimTouchId=null;
+Input.wantWalk = false;
 
 function initInput(canvas){
   window.addEventListener('keydown',e=>{
     if(e.repeat)return;
     Input.keys[e.code]=true;
+    if(e.code==='KeyC'||e.code==='ControlLeft'||e.code==='ControlRight')Input.wantWalk=true;
     if(e.code==='ShiftLeft'||e.code==='ShiftRight')Input.wantDash=true;
     if(e.code==='KeyR')Input.wantReload=true;
     if(e.code==='Enter'||e.code==='Space')Input.cmd=true;
   });
-  window.addEventListener('keyup',e=>{Input.keys[e.code]=false;});
+  window.addEventListener('keyup',e=>{Input.keys[e.code]=false;
+    if(e.code==='KeyC'||e.code==='ControlLeft'||e.code==='ControlRight')Input.wantWalk=false;});
 
   const toScreen=(cx,cy)=>{return{x:cx,y:cy};};
   canvas.addEventListener('mousemove',e=>{const p=toScreen(e.clientX,e.clientY);Input.mouse.x=p.x;Input.mouse.y=p.y;});
@@ -189,7 +346,7 @@ function initInput(canvas){
     const stk=document.getElementById('stick-base'),knb=document.getElementById('stick-knob');
     const getStickCenter=()=>{const r=stk.getBoundingClientRect();return {x:r.left+r.width/2, y:r.top+r.height/2, r:r.width/2};};
     const isStickZone=(t)=>{const c=getStickCenter();const pad=35;return (t.clientX <= c.x + c.r + pad && t.clientY >= c.y - c.r - pad);};
-    const updateStick=(t)=>{const c=getStickCenter();let dx=t.clientX-c.x, dy=t.clientY-c.y;const maxR=c.r*0.8;const mag=Math.hypot(dx,dy);if(mag>maxR){dx*=maxR/mag;dy*=maxR/mag;}knb.style.transform='translate('+dx+'px,'+dy+'px)';Input.stick.dx=dx/maxR;Input.stick.dy=dy/maxR;Input.stick.active=true;};
+    const updateStick=(t)=>{const c=getStickCenter();let dx=t.clientX-c.x, dy=t.clientY-c.y;const maxR=c.r*0.8;const mag=Math.hypot(dx,dy);if(mag>maxR){dx*=maxR/mag;dy*=maxR/mag;}knb.style.transform='translate('+dx+'px,'+dy+'px)';Input.stick.dx=dx/maxR;Input.stick.dy=dy/maxR;Input.stick.active=true;Input.wantWalk=mag < (maxR * 0.6);};
     const resetStick=()=>{stickTouchId=null;Input.stick.active=false;Input.stick.dx=0;Input.stick.dy=0;knb.style.transform='translate(0px, 0px)';};
 
     canvas.addEventListener('touchstart',e=>{
@@ -244,20 +401,20 @@ function createPlayer(spawn){
     x:spawn.x,y:spawn.y,r:14,speed:280,
     weaponId:'pistol',ammo:WEAPONS.pistol.ammoMax,reloading:0,cd:0,
     dashCd:0,dashT:0,dashDX:0,dashDY:0,dashUnlocked:false,invuln:0,
-    hp:3,maxHp:3 // 3 HP по умолчанию
+    hp:30,maxHp:30 // 30 HP по умолчанию
   };
 }
 
 function applyLevelStart(Game){
   const cfg=getLevelConfig(Game.level);
   Game.levelCfg=cfg;Game.wave=1;Game.spawnT=0.5;Game.globalPower=1;Game.scaleT=5;Game.boss=null;
-  Game.player.weaponId=cfg.weaponOrder[0];const w=WEAPONS[Game.player.weaponId];Game.player.ammo=w.ammoMax;Game.player.reloading=0;
+  Game.player.weaponId=cfg.weaponOrder[0];const w=WEAPONS[Game.player.weaponId];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
 }
 
 function maybeUnlockWeapon(Game){
   const cfg=Game.levelCfg,idx=cfg.weaponWaves.indexOf(Game.wave);if(idx===-1)return;
   const wid=cfg.weaponOrder[idx];if(Game.player.weaponId===wid)return;
-  Game.player.weaponId=wid;const w=WEAPONS[wid];Game.player.ammo=w.ammoMax;Game.player.reloading=0;
+  Game.player.weaponId=wid;const w=WEAPONS[wid];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
   spawnBanner(Game,{title:'НОВОЕ ОРУЖИЕ',subtitle:w.icon+'  '+w.name.toUpperCase(),color:'#e8a317'});
   screenFlash(Game,0.6);burst(Game,Game.player.x,Game.player.y,30,'#e8a317',300);
 }
@@ -266,18 +423,18 @@ function maybeUnlockDash(Game){if(Game.player.dashUnlocked||Game.wave<5)return;G
 
 function fireWeapon(Game,ax,ay){
   const p=Game.player,w=WEAPONS[p.weaponId];if(p.cd>0||p.ammo<=0||p.reloading>0)return;
-  p.cd=w.cd;p.ammo--;Game.shotSlowmo=0.5;if(p.ammo===0)p.reloading=w.reload;
+  p.cd=w.cd;if (Math.random() >= Game.stats.ammoSave) p.ammo--;Game.shotSlowmo=0.5;if(p.ammo===0)p.reloading=w.reload*Game.stats.reloadMul;
   const ang=Math.atan2(ay-p.y,ax-p.x);const mid=(w.pellets-1)/2;
   for(let i=0;i<w.pellets;i++){
     const a=ang+(i-mid)*w.spread+(Math.random()-0.5)*w.jitter;
-    Game.bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,r:w.splash?7:4,friendly:true,dmg:w.dmg,pierce:w.pierce,splash:w.splash||0,dead:false,trail:[],color:w.id==='rocket'?'#d97706':w.id==='bow'?'#0ea5c7':'#e8a317'});
+    Game.bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,r:w.splash?7:4,friendly:true,dmg:w.dmg*Game.stats.dmgMul,pierce:w.pierce+Game.stats.pierceAdd,splash:w.splash||0,dead:false,trail:[],color:w.id==='rocket'?'#d97706':w.id==='bow'?'#0ea5c7':'#e8a317'});
   }
   muzzleFlash(Game,p.x,p.y,ang);screenShake(Game,w.id==='rocket'?6:w.id==='shotgun'?4:2);
 }
 
-function reloadWeapon(Game){const p=Game.player,w=WEAPONS[p.weaponId];if(p.ammo<w.ammoMax&&p.reloading<=0)p.reloading=w.reload;}
-function tryDash(Game,dx,dy){const p=Game.player;if(!p.dashUnlocked||p.dashCd>0)return;if(!dx&&!dy)return;const mag=Math.hypot(dx,dy);p.dashDX=dx/mag;p.dashDY=dy/mag;p.dashT=0.16;p.dashCd=2.6;p.invuln=0.24;burst(Game,p.x,p.y,16,'#0ea5c7',250);screenShake(Game,3);}
-function updatePlayerMove(Game,dt,mx,my){const p=Game.player;p.dashCd=Math.max(0,p.dashCd-dt);p.invuln=Math.max(0,p.invuln-dt);let moving=false;if(p.dashT>0){p.dashT-=dt;moveWithCollision(Game.map,p,p.dashDX*900*dt,p.dashDY*900*dt);moving=true;}else if(mx||my){const mag=Math.hypot(mx,my);moveWithCollision(Game.map,p,(mx/mag)*p.speed*dt,(my/mag)*p.speed*dt);moving=true;}return moving;}
+function reloadWeapon(Game){const p=Game.player,w=WEAPONS[p.weaponId];if(p.ammo<Math.max(1, w.ammoMax + Game.stats.ammoAdd)&&p.reloading<=0)p.reloading=w.reload*Game.stats.reloadMul;}
+function tryDash(Game,dx,dy){const p=Game.player;if(!p.dashUnlocked||p.dashCd>0)return;if(!dx&&!dy)return;const mag=Math.hypot(dx,dy);p.dashDX=dx/mag;p.dashDY=dy/mag;p.dashT=0.16;p.dashCd=2.6 * Game.stats.dashCdMul;p.invuln=0.24;burst(Game,p.x,p.y,16,'#0ea5c7',250);screenShake(Game,3);}
+function updatePlayerMove(Game,dt,mx,my){const p=Game.player;p.dashCd=Math.max(0,p.dashCd-dt);p.invuln=Math.max(0,p.invuln-dt);let moving=false;if(p.dashT>0){p.dashT-=dt;moveWithCollision(Game.map,p,p.dashDX*900*dt,p.dashDY*900*dt);moving=true;}else if(mx||my){const mag=Math.hypot(mx,my);const walkMul = Input.wantWalk ? 0.5 : 1.0; moveWithCollision(Game.map,p,(mx/mag)*p.speed*walkMul*Game.stats.speedMul*dt,(my/mag)*p.speed*walkMul*Game.stats.speedMul*dt);moving=true;}return moving;}
 
 function spawnEnemy(Game){
   const cfg=Game.levelCfg,type=cfg.enemyTypes[Math.floor(Math.random()*cfg.enemyTypes.length)];
@@ -300,7 +457,7 @@ function killEnemy(Game,e){
   if(!Game.loot) Game.loot = [];
   
   // 25% шанс выпадания HP сферы
-  if(Math.random() < 0.25){
+  if(Math.random() < 0.10) { Game.loot.push({x: e.x, y: e.y, type: 'item', item: generateLootItem(), r: 10, t: 0}); } else if(Math.random() < 0.25){
     Game.loot.push({x: e.x, y: e.y, type: 'hp', r: 8});
   } 
   // 30% шанс выпадания очков мощи
@@ -315,14 +472,14 @@ function killEnemy(Game,e){
     burst(Game,e.x,e.y,80,'#d92638',450,150);
     screenFlash(Game,1.0);screenShake(Game,15);
     spawnFloatingText(Game,e.x,e.y-40,'BOSS SLAIN','#e8a317');
-    Game.onBossDefeated();
+    Game.loot.push({x: e.x, y: e.y, type: 'item', item: generateLootItem(Math.random() > 0.5 ? 'legendary' : 'epic'), r: 10, t: 0}); Game.onBossDefeated();
     return;
   }
   
   Game.kills++;
   burst(Game,e.x,e.y,14,e.type==='shooter'?'#b829dd':e.type==='tank'?'#5a3a86':'#d92638',280,100);
   spawnFloatingText(Game,e.x,e.y-15,'+1','#d92638');
-  if(Game.kills%10===0)Game.wave++;
+  if(Game.kills%10===0){ Game.wave++; Game.loot.push({x: Game.player.x + (Math.random()-0.5)*40, y: Game.player.y + (Math.random()-0.5)*40, type: 'item', item: generateLootItem(), r: 10, t: 0}); }
 }
 
 function updateEnemies(Game,sdt){
@@ -336,7 +493,7 @@ function updateEnemies(Game,sdt){
     
     const rr=e.r+p.r;
     if(p.invuln<=0&&Math.hypot(e.x-p.x,e.y-p.y)<rr){
-      p.hp--;
+      p.hp -= 10 * Game.stats.dmgTakenMul;
       p.invuln=1.2; // 1.2 сек бессмертия при ударе
       burst(Game,p.x,p.y,30,'#d92638',300);
       screenShake(Game,15);screenFlash(Game, 0.5);
@@ -359,7 +516,7 @@ function updateBullets(Game,sdt){
       const p=Game.player,rr=b.r+p.r*0.5;
       if(p.invuln<=0&&Math.hypot(b.x-p.x,b.y-p.y)<rr){
         b.dead=true;
-        p.hp--;
+        p.hp -= 10 * Game.stats.dmgTakenMul;
         p.invuln=1.2;
         burst(Game,p.x,p.y,30,'#d92638',300);
         screenShake(Game,15);screenFlash(Game, 0.5);
@@ -371,10 +528,44 @@ function updateBullets(Game,sdt){
 
 const Game={
   state:'menu',viewW:window.innerWidth,viewH:window.innerHeight,effViewW:window.innerWidth,effViewH:window.innerHeight,
-  map:null,camera:new Camera(),player:null,enemies:[],bullets:[],particles:[],banners:[],floatTexts:[],impacts:[],loot:[],
+  map:null,camera:new Camera(),player:null,enemies:[],bullets:[],particles:[],banners:[],floatTexts:[],impacts:[],loot:[], inventory:[], stats:{}, slowWalking: false,
   level:0,levelCfg:null,wave:1,kills:0,timeScale:0.05,shotSlowmo:0,spawnT:0,globalPower:1,scaleT:5,
   boss:null,flash:0,shake:0,leaderboard:loadLeaderboard(),pendingScore:null,
 
+
+  recalcStats() {
+    const s = { dmgMul: 1, pierceAdd: 0, dashCdMul: 1, speedMul: 1, slowTime: 0, reloadMul: 1, pickupMul: 1, ammoSave: 0, hpMul: 1, ammoAdd: 0, dmgTakenMul: 1 };
+    for (const item of this.inventory) {
+      if(!item) continue;
+      for (const affix of [item.pos, item.neg]) {
+        if (affix.id === 'dmg') s.dmgMul += affix.val;
+        if (affix.id === 'pierce') s.pierceAdd += affix.val;
+        if (affix.id === 'dash_cd') s.dashCdMul += affix.val;
+        if (affix.id === 'speed') s.speedMul += affix.val;
+        if (affix.id === 'slow_time') s.slowTime = affix.val;
+        if (affix.id === 'reload') s.reloadMul += affix.val;
+        if (affix.id === 'pickup') s.pickupMul += affix.val;
+        if (affix.id === 'ammo_save') s.ammoSave += affix.val;
+        if (affix.id === 'hp_down') s.hpMul += affix.val;
+        if (affix.id === 'speed_down') s.speedMul += affix.val;
+        if (affix.id === 'ammo_down') s.ammoAdd += affix.val;
+        if (affix.id === 'dmg_taken') s.dmgTakenMul += affix.val;
+        if (affix.id === 'reload_up') s.reloadMul += affix.val;
+        if (affix.id === 'dmg_down') s.dmgMul += affix.val;
+      }
+    }
+    s.dmgMul = Math.max(0.1, s.dmgMul);
+    s.speedMul = Math.max(0.1, s.speedMul);
+    s.hpMul = Math.max(0.1, s.hpMul);
+    s.dashCdMul = Math.max(0, s.dashCdMul);
+    s.reloadMul = Math.max(0.1, s.reloadMul);
+
+    if (this.player) {
+      this.player.maxHp = Math.round(30 * s.hpMul);
+      if (this.player.hp > this.player.maxHp) this.player.hp = this.player.maxHp;
+    }
+    return s;
+  },
   die(){
     if(this.state!=='play')return;
     this.state='death';
@@ -392,8 +583,8 @@ const Game={
   onBossDefeated(){this.level++;applyLevelStart(this);spawnBannerLevelUp(this,this.levelCfg);},
   start(){
     this.state='play';this.level=0;this.kills=0;
-    this.enemies=[];this.bullets=[];this.particles=[];this.banners=[];this.floatTexts=[];this.impacts=[];this.loot=[];
-    this.map=generateMap();this.player=createPlayer(this.map.spawnWorld);
+    this.enemies=[];this.bullets=[];this.particles=[];this.banners=[];this.floatTexts=[];this.impacts=[];this.loot=[]; this.inventory=[]; this.stats=this.recalcStats();
+    this.map=generateMap();this.player=createPlayer(this.map.spawnWorld); this.stats=this.recalcStats();
     applyLevelStart(this);
     this.camera.x=clamp(this.player.x-this.viewW/2,0,Math.max(0,this.map.pxW-this.viewW));
     this.camera.y=clamp(this.player.y-this.viewH/2,0,Math.max(0,this.map.pxH-this.viewH));
@@ -401,6 +592,7 @@ const Game={
   },
   update(dt){
     if(this.state==='menu'){if(Input.cmd)this.start();Input.cmd=false;return;}
+    if(this.state==='loot-compare'){return;}
     if(this.state==='enter-name')return;
     if(this.state==='death'){
       if(Input.cmd)this.start();Input.cmd=false;
@@ -410,7 +602,21 @@ const Game={
     const p=this.player,{mvX,mvY}=getMoveVector();
     if(Input.wantDash){const ddx=Input.dashDirX||mvX,ddy=Input.dashDirY||mvY;tryDash(this,ddx,ddy);Input.wantDash=false;Input.dashDirX=0;Input.dashDirY=0;}
     const moving=updatePlayerMove(this,dt,mvX,mvY);
-    this.timeScale=moving?1.0:(this.shotSlowmo>0?0.3:0.03);
+
+
+    let isWalking = Input.wantWalk;
+    if(moving) {
+      if(isWalking) {
+        this.timeScale = this.stats.slowTime ? this.stats.slowTime : 1.0;
+      } else {
+        this.timeScale = 1.0;
+      }
+    } else {
+      this.timeScale = (this.shotSlowmo>0?0.3:0.03);
+    }
+
+
+
     this.shotSlowmo=Math.max(0,this.shotSlowmo-dt);
     const sdt=dt*this.timeScale;
     this.camera.follow(p,this.viewW,this.viewH,dt);
@@ -430,27 +636,34 @@ const Game={
     }
     updateEnemies(this,sdt);updateBullets(this,sdt);
     
+
     // Подбор предметов
     if(this.loot) {
       let keptLoot = [];
       for(let i=0; i<this.loot.length; i++){
         let l = this.loot[i];
-        if(Math.hypot(p.x - l.x, p.y - l.y) < p.r + l.r + 15) { 
+        if(Math.hypot(p.x - l.x, p.y - l.y) < (p.r + l.r + 15)*this.stats.pickupMul) {
           if(l.type === 'hp') {
             if(p.hp < p.maxHp) {
-              p.hp++;
-              spawnFloatingText(this, p.x, p.y-20, '+1 HP', '#10b981');
+              p.hp+=10;
+              spawnFloatingText(this, p.x, p.y-20, '+10 HP', '#10b981');
               burst(this, p.x, p.y, 15, '#10b981', 180);
             } else {
               this.kills += 15;
               spawnFloatingText(this, p.x, p.y-20, '+15 ОЧКОВ', '#e8a317');
             }
-          } else if(l.type === 'weapon') {
-            this.globalPower += 0.15;
-            this.kills += 25;
-            spawnFloatingText(this, p.x, p.y-20, 'МОЩЬ UP!', l.color);
-            burst(this, p.x, p.y, 30, l.color, 250);
-            screenFlash(this, 0.3);
+          } else if(l.type === 'item') {
+            if (this.inventory.length < 4) {
+              this.inventory.push(l.item);
+              this.stats = this.recalcStats();
+              spawnBanner(this, {title: l.item.rarity.toUpperCase(), subtitle: l.item.pos.name + ' & ' + l.item.neg.name, color: l.item.color});
+              burst(this, p.x, p.y, 30, l.item.color, 250);
+            } else {
+              this.pendingLoot = l.item;
+              this.state = 'loot-compare';
+              document.getElementById('loot-compare').style.display = 'flex';
+              updateLootCompareUI();
+            }
           }
         } else {
           keptLoot.push(l);
@@ -534,6 +747,7 @@ function drawMap(cam,vw,vh){
 }
 
 function drawWorldEntities(){
+
   // 1. Отрисовка выпавшего лута
   if(Game.loot) {
     for(let i=0; i<Game.loot.length; i++){
@@ -546,10 +760,17 @@ function drawWorldEntities(){
         ctx.fillStyle = '#fff';
         ctx.fillRect(l.x-2, l.y-l.r+2, 4, l.r*2-4); 
         ctx.fillRect(l.x-l.r+2, l.y-2, l.r*2-4, 4);
-      } else if(l.type === 'weapon') {
-        ctx.shadowColor = l.color;
-        ctx.fillStyle = l.color;
-        ctx.beginPath(); ctx.moveTo(l.x, l.y-l.r); ctx.lineTo(l.x+l.r, l.y); ctx.lineTo(l.x, l.y+l.r); ctx.lineTo(l.x-l.r, l.y); ctx.fill();
+      } else if(l.type === 'item') {
+        l.t = (l.t || 0) + 1/60;
+        ctx.shadowColor = l.item.color;
+        ctx.shadowBlur = l.item.rarity === 'legendary' ? 15 + Math.sin(l.t*5)*5 : 10;
+        ctx.fillStyle = l.item.color;
+        ctx.font = 'bold 16px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(l.item.icon, l.x, l.y + 6);
+        ctx.strokeStyle = l.item.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(l.x, l.y, l.r + (l.item.rarity === 'legendary' ? Math.sin(l.t*10)*2 : 0), 0, Math.PI*2); ctx.stroke();
       }
       ctx.shadowBlur = 0;
     }
@@ -645,6 +866,25 @@ function drawWorldEntities(){
 }
 
 function drawHud(){
+
+  const hudContainer = document.getElementById('hud-inventory');
+  if (Game.state === 'play' || Game.state === 'loot-compare') {
+    let html = '';
+    for(let i=0; i<4; i++) {
+      if(Game.inventory[i]) {
+        const item = Game.inventory[i];
+        const isLeg = item.rarity === 'legendary';
+        const pulse = isLeg ? 'box-shadow: 0 0 10px '+item.color+'; animation: pulse 1s infinite alternate;' : '';
+        html += '<div style="width:32px; height:32px; border:2px solid '+item.color+'; border-radius:4px; display:flex; align-items:center; justify-content:center; color:'+item.color+'; background:rgba(26,26,26,0.5); font-size:18px; text-shadow: 0 0 4px '+item.color+'; ' + pulse + '">' + item.icon + '</div>';
+      } else {
+        html += '<div style="width:32px; height:32px; border:1px solid rgba(26,26,26,0.3); border-radius:4px; background:rgba(0,0,0,0.1);"></div>';
+      }
+    }
+    if(hudContainer && hudContainer.innerHTML !== html) hudContainer.innerHTML = html;
+  } else if(hudContainer) {
+    hudContainer.innerHTML = '';
+  }
+
   const p=Game.player;
   const fs=Math.max(11,Math.min(15,Game.viewW/32));
   ctx.shadowColor='rgba(255,255,255,0.5)';ctx.shadowBlur=4;
@@ -652,7 +892,7 @@ function drawHud(){
   ctx.fillText('УР:'+(Game.level+1)+' В:'+Game.wave+(Game.boss?' [БОСС]':'')+' КИЛЛ:'+Game.kills,12,28);
 
   const w=WEAPONS[p.weaponId];
-  let as=p.reloading>0?'РЕЛОАД...':'['+'●'.repeat(p.ammo)+'○'.repeat(Math.max(0,w.ammoMax-p.ammo))+']';
+  let as=p.reloading>0?'РЕЛОАД...':'['+'●'.repeat(p.ammo)+'○'.repeat(Math.max(0,Math.max(1, w.ammoMax + Game.stats.ammoAdd)-p.ammo))+']';
   ctx.textAlign='right';ctx.fillStyle=p.reloading>0?'#888':'#1a1a1a';
   const minimapSize=Math.min(140,Game.viewW*0.2);
   ctx.fillText(w.icon+' '+as,Game.viewW-minimapSize-18,28);
