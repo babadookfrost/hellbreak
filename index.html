@@ -69,10 +69,24 @@
 </div>
 
 <script src="js/input.js"></script>
+<script src="js/floors.js"></script>
 <script src="js/weapons.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/loot.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
+
+<div class="name-entry" id="portal-ui" style="display:none; flex-direction:column; background:rgba(26,26,26,0.7);">
+  <div style="background:#fff; border:2px solid var(--cyan); padding:24px; border-radius:12px; max-width:90vw; width:400px; display:flex; flex-direction:column; gap:16px;">
+    <div class="name-entry-title" style="color:var(--cyan);">ПОРТАЛ</div>
+    <div style="text-align:center; font-size:14px; color:#555;">Твоя мясорубка может закончиться здесь.</div>
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+      <button id="btn-portal-descend" style="background:var(--cyan); color:#1a1a1a; border:none; padding:14px; font-weight:bold; border-radius:6px; cursor:pointer; font-size:16px;">СПУСТИТЬСЯ (СЛЕД. ЭТАЖ)</button>
+      <button id="btn-portal-evac" style="background:var(--ind); color:#1a1a1a; border:none; padding:14px; font-weight:bold; border-radius:6px; cursor:pointer; font-size:16px;">ЭВАКУАЦИЯ (+30% ОСКОЛКОВ)</button>
+      <button id="btn-portal-cancel" style="background:#999; color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-size:14px; margin-top:8px;">ОТМЕНА</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

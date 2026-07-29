@@ -1,9 +1,23 @@
 const ENEMY_BASE={melee:{hp:1,speed:160,r:16},shooter:{hp:2,speed:50,r:16,fireCd:1.5,bulletSpeed:500},tank:{hp:6,speed:95,r:22},kamikaze:{hp:1,speed:220,r:14},sniper:{hp:2,speed:40,r:14,fireCd:3.0,bulletSpeed:900}};
 
-function getLevelConfig(li){
+function getLevelConfig(li, wave=1){
+  const effectiveWave = Math.min(20, wave);
+  const effectiveLi = (effectiveWave - 1) / 5;
   const shift=li%WEAPON_POOL.length;
   const rotated=WEAPON_POOL.slice(shift).concat(WEAPON_POOL.slice(0,shift));
-  return{index:li,name:'УРОВЕНЬ '+(li+1),weaponOrder:rotated.slice(0,5),weaponWaves:[1,3,5,7,9],bossWave:10,enemyTypes:li>=2?['melee','shooter','tank','kamikaze','sniper']:li>=1?['melee','shooter','tank','kamikaze']:['melee','shooter'],hpMul:1+li*0.4,speedMul:1+li*0.18,dmgMul:1+li*0.3,bossHp:60+li*50};
+    const floor = getCurrentFloor(li);
+  return {
+    index: li,
+    name: floor.name,
+    weaponOrder: rotated.slice(0,5),
+    weaponWaves: [1,2,3,4,5], // these will now be offset by floor (e.g. 1, 3, 5 relative to floor start)
+    bossWave: 5, // boss is always every 5th wave
+    enemyTypes: li >= 2 ? ['melee','shooter','tank','kamikaze','sniper'] : li >= 1 ? ['melee','shooter','tank','kamikaze'] : ['melee','shooter'],
+    hpMul: 1 + effectiveLi * 0.4,
+    speedMul: 1 + effectiveLi * 0.18,
+    dmgMul: 1 + effectiveLi * 0.3,
+    bossHp: 60 + effectiveLi * 50
+  };
 }
 
 function playSoundHit(isCrit) {
@@ -42,7 +56,7 @@ function playSoundDeath(type) {
 }
 
 function spawnEnemy(Game){
-  const cfg=Game.levelCfg,type=cfg.enemyTypes[Math.floor(Math.random()*cfg.enemyTypes.length)];
+  const cfg=getLevelConfig(Game.level, Game.wave),type=cfg.enemyTypes[Math.floor(Math.random()*cfg.enemyTypes.length)];
   const base=ENEMY_BASE[type];const vs=Math.max(Game.effViewW||Game.viewW,Game.effViewH||Game.viewH);
   const spot=randomFloorTileFar(Game.map,Game.player.x,Game.player.y,vs*0.7);const power=Math.min(4.5,Game.globalPower);
   const hp=Math.max(1,Math.round(base.hp*cfg.hpMul*Math.min(2.5,power)));
@@ -50,9 +64,11 @@ function spawnEnemy(Game){
 }
 
 function spawnBoss(Game){
-  const cfg=Game.levelCfg;const spot=randomFloorTileFar(Game.map,Game.player.x,Game.player.y,500);
-  Game.boss={x:spot.x,y:spot.y,r:46,hp:cfg.bossHp,maxHp:cfg.bossHp,speed:75*cfg.speedMul,burstCd:1.6,dead:false,flash:0,isBoss:true,targetOffsetX:0,targetOffsetY:0,offsetUpdateTimer:0,dodgeTimer:0,dodgeAng:0};
-  spawnBanner(Game,{title:'БОСС ПРИБЫЛ',subtitle:'ВЫЖИВИ',color:'#d92638'});screenFlash(Game,0.8);screenShake(Game,10);
+  const isHeart = (Game.level % FLOORS.length) === 3;
+
+  const cfg=getLevelConfig(Game.level, Game.wave);const spot=randomFloorTileFar(Game.map,Game.player.x,Game.player.y,500);
+  Game.boss={x:spot.x,y:spot.y,r:isHeart ? 56 : 46,hp:cfg.bossHp * (isHeart ? 1.5 : 1),maxHp:cfg.bossHp * (isHeart ? 1.5 : 1),speed:(isHeart ? 50 : 75)*cfg.speedMul,burstCd:isHeart ? 1.2 : 1.6,dead:false,flash:0,isBoss:true,isHeart:isHeart,targetOffsetX:0,targetOffsetY:0,offsetUpdateTimer:0,dodgeTimer:0,dodgeAng:0};
+  spawnBanner(Game,{title:isHeart ? 'СЕРДЦЕ МЯСОРУБКИ' : 'БОСС ПРИБЫЛ',subtitle:isHeart ? 'ОНО ПУЛЬСИРУЕТ' : 'ВЫЖИВИ',color:'#d92638'});screenFlash(Game,0.8);screenShake(Game,10);
 }
 
 function killEnemy(Game,e){
@@ -82,7 +98,7 @@ function killEnemy(Game,e){
 
   // 25% шанс выпадания HP сферы
   if(Math.random() < 0.10) {
-    const item = generateLootItem();
+    const item = generateLootItem(null, Game.floorIndex || 0, Game.floorIndex || 0);
     let lx = e.x, ly = e.y;
     if ((item.rarity === 'epic' || item.rarity === 'legendary') && Game.enemies.length > 2 && Math.random() < 0.5) {
       // Риск/награда: спавним эпик/легендарку рядом с группой живых врагов
@@ -107,8 +123,8 @@ function killEnemy(Game,e){
     Game.kills+=20;
     burst(Game,e.x,e.y,80,'#d92638',450,150);
     screenFlash(Game,1.0);screenShake(Game,15);
-    spawnFloatingText(Game,e.x,e.y-40,'BOSS SLAIN','#e8a317');
-    Game.loot.push({x: e.x, y: e.y, type: 'item', item: generateLootItem(Math.random() > 0.5 ? 'legendary' : 'epic'), r: 10, t: 0}); Game.onBossDefeated();
+    spawnFloatingText(Game,e.x,e.y-40,e.isHeart ? 'СЕРДЦЕ ОСТАНОВЛЕНО' : 'BOSS SLAIN', e.isHeart ? '#ff0000' : '#e8a317');
+    Game.loot.push({x: e.x, y: e.y, type: 'item', item: generateLootItem(Math.random() > 0.5 ? 'legendary' : 'epic', Game.floorIndex || 0), r: 10, t: 0}); Game.onBossDefeated();
     return;
   }
 
@@ -116,8 +132,8 @@ function killEnemy(Game,e){
   burst(Game,e.x,e.y,14,e.type==='shooter'?'#b829dd':e.type==='tank'?'#5a3a86':'#d92638',280,100);
   spawnFloatingText(Game,e.x,e.y-15,'+1','#d92638');
   if(Game.kills%10===0){
-    Game.wave++;
-    const item = generateLootItem();
+    Game.wave++; Game.bossSpawnedThisWave=false;
+    const item = generateLootItem(null, Game.floorIndex || 0, Game.floorIndex || 0);
     let lx = Game.player.x + (Math.random()-0.5)*40;
     let ly = Game.player.y + (Math.random()-0.5)*40;
     if ((item.rarity === 'epic' || item.rarity === 'legendary') && Game.enemies.length > 2 && Math.random() < 0.5) {

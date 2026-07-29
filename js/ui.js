@@ -92,7 +92,12 @@ function qualifies(l,s){return l.length<10||s>l[l.length-1].score;}
 function addEntry(l,e){const n=[...l,e].sort((a,b)=>b.score-a.score).slice(0,10);saveLeaderboard(n);return n;}
 
 function spawnBannerLevelUp(Game,cfg){
-  Game.banners.push({title:'НОВЫЙ УРОВЕНЬ',subtitle:cfg.name+' ОТКРЫТ',color:'#d97706',t:0,duration:2.2});
+
+  const floorName = cfg.name || ('УРОВЕНЬ ' + (Game.level + 1));
+  const floor = FLOORS[Game.level % FLOORS.length];
+  const subtitle = floor ? floor.subtitle : 'ВХОД';
+  Game.banners.push({title:'ЭТАЖ ' + (Game.level + 1) + ' · ' + floorName, subtitle: subtitle, color: floor ? floor.palette['--cyan'] : '#0ea5c7', t:0, duration:3.0});
+
   screenFlash(Game,1.0);screenShake(Game,8);
   burst(Game,Game.player.x,Game.player.y,60,'#d97706',400);
 }
@@ -173,7 +178,7 @@ function drawMenu(){
   ctx.fillStyle=g;ctx.fillRect(0,0,Game.viewW,Game.viewH);
   const ts=Math.min(85,Game.viewW/9);
   ctx.shadowColor='#d92638';ctx.shadowBlur=20;
-  ctx.fillStyle='#d92638';ctx.font='bold '+ts+'px monospace';ctx.textAlign='center';
+  ctx.fillStyle=Game.isEvac ? '#0ea5c7' : '#d92638';ctx.shadowColor=Game.isEvac ? '#0ea5c7' : '#d92638';ctx.font='bold '+ts+'px monospace';ctx.textAlign='center';
   ctx.fillText('М Я С О Р У Б К А',Game.viewW/2,Game.viewH*0.3);
   ctx.shadowBlur=0;
   const ss=Math.max(13,Math.min(18,Game.viewW/38));
@@ -217,11 +222,11 @@ function drawDeathScreen(){
   const ts=Math.min(75,Game.viewW/10);
   ctx.shadowColor='#d92638';ctx.shadowBlur=20;
   ctx.fillStyle='#d92638';ctx.font='bold '+ts+'px monospace';ctx.textAlign='center';
-  ctx.fillText('П О Т Р А Ч Е Н О',Game.viewW/2,Game.viewH*0.32);
+  ctx.fillText(Game.isEvac ? 'ЭВАКУАЦИЯ УСПЕШНА' : 'П О Т Р А Ч Е Н О',Game.viewW/2,Game.viewH*0.32);
   ctx.shadowBlur=0;
   const ss=Math.max(13,Math.min(20,Game.viewW/36));
   ctx.fillStyle='#5a5a5a';ctx.font=ss+'px monospace';
-  ctx.fillText('Убито: '+Game.kills+' · Волна: '+Game.wave+' · Уровень: '+(Game.level+1),Game.viewW/2,Game.viewH*0.32+ts*0.6);
+  ctx.fillText('Убито: '+Game.kills+' · Волна: '+Game.wave+' · Этаж: '+(Game.level+1),Game.viewW/2,Game.viewH*0.32+ts*0.6);
   ctx.fillStyle='#0ea5c7';ctx.font='bold '+(ss+2)+'px monospace';
   ctx.fillText('ПОЛУЧЕНО ОСКОЛКОВ: +'+(Game.lastEarnedShards||0),Game.viewW/2,Game.viewH*0.32+ts*0.85);
   ctx.fillStyle='#e8a317';ctx.shadowColor='#e8a317';ctx.shadowBlur=6;
@@ -242,6 +247,29 @@ function drawDeathScreen(){
 }
 
 function wireNameEntry(){
+  document.getElementById('btn-portal-descend').addEventListener('click', () => {
+    document.getElementById('portal-ui').style.display='none';
+    if(Game.state !== 'portal') return;
+
+    Game.level++;
+    // ensure wave bumps past the boss wave so we don't spawn another boss instantly
+    if (Game.wave % 5 === 0) Game.wave++;
+    applyLevelStart(Game, true);
+ // true = continuation
+    spawnBannerLevelUp(Game, Game.levelCfg);
+    Game.state = 'play';
+  });
+  document.getElementById('btn-portal-evac').addEventListener('click', () => {
+    document.getElementById('portal-ui').style.display='none';
+    if(Game.state !== 'portal') return;
+    Game.isEvac = true;
+    Game.die(); // Complete run via die function, but mark as evac
+  });
+  document.getElementById('btn-portal-cancel').addEventListener('click', () => {
+    document.getElementById('portal-ui').style.display='none';
+    if(Game.state === 'portal') { Game.state = 'play'; Game.portalTriggerCd = 2.0; }
+  });
+
   const form=document.getElementById('name-form');
   const inputEl=document.getElementById('name-input');
   form.addEventListener('submit',e=>{
