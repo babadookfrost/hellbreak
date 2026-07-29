@@ -14,6 +14,7 @@
 <div class="stick-base" id="stick-base"><div class="stick-knob" id="stick-knob"></div></div>
 <div class="btn btn-dash" id="btn-dash">D</div>
 <div class="btn btn-reload" id="btn-reload">R</div>
+<div class="btn btn-inventory" id="btn-inventory">I</div>
 </div>
 
 <div id="hud-inventory" style="position:fixed; top:40px; left:12px; display:flex; gap:6px; pointer-events:none; z-index:5;">
@@ -38,6 +39,15 @@
     </div>
 
     <button id="btn-upgrades-close" style="background:var(--bone); color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px; margin-top: 8px;">ЗАКРЫТЬ</button>
+  </div>
+</div>
+
+<div class="name-entry" id="inventory-menu" style="display:none; flex-direction:column;">
+  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:600px; display:flex; flex-direction:column; gap:16px;">
+    <div class="name-entry-title">ИНВЕНТАРЬ</div>
+    <div style="text-align:center; font-size:14px; color:#555;">Текущие предметы и их эффекты</div>
+    <div id="inventory-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+    <button id="btn-inventory-close" style="background:var(--bone); color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px; margin-top: 8px;">ЗАКРЫТЬ</button>
   </div>
 </div>
 
@@ -73,8 +83,22 @@
 <script src="js/weapons.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/loot.js"></script>
+<script src="js/contracts.js"></script>
+<script src="js/radio.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
+
+<div class="name-entry" id="contracts-menu" style="display:none; flex-direction:column;">
+  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:600px; display:flex; flex-direction:column; gap:16px;">
+    <div class="name-entry-title">КОНТРАКТЫ НА ЗАБЕГ</div>
+    <div style="text-align:center; font-size:14px; color:#555;">Выберите 2 контракта. Выполненные контракты дают +15% осколков каждый.</div>
+    <div id="contracts-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+    <div style="display:flex; justify-content:space-between; margin-top:8px;">
+      <button id="btn-contracts-cancel" style="flex:0.4; background:#999; color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;">ОТМЕНА</button>
+      <button id="btn-contracts-start" style="flex:0.55; background:var(--ind); color:#1a1a1a; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;" disabled>НАЧАТЬ (Выбрано 0/2)</button>
+    </div>
+  </div>
+</div>
 
 <div class="name-entry" id="portal-ui" style="display:none; flex-direction:column; background:rgba(26,26,26,0.7);">
   <div style="background:#fff; border:2px solid var(--cyan); padding:24px; border-radius:12px; max-width:90vw; width:400px; display:flex; flex-direction:column; gap:16px;">

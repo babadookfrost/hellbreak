@@ -95,6 +95,10 @@ function applyLevelStart(Game, isContinuation = false){
     Game.player.weaponId=cfg.weaponOrder[0];const w=WEAPONS[Game.player.weaponId];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
   }
 
+  if (typeof checkContractsOnFloorStart === 'function') checkContractsOnFloorStart(Game.level);
+  if (typeof queueRadioMessage === 'function') queueRadioMessage(Game.level % 4);
+  if (typeof checkContractsOnWaveStart === 'function') checkContractsOnWaveStart(Game.wave);
+
 }
 
 function maybeUnlockDash(Game){
@@ -109,7 +113,12 @@ function maybeUnlockDash(Game){
   spawnBanner(Game,{title:'НОВЫЙ НАВЫК',subtitle:'РЫВОК: SHIFT / КНОПКА',color:'#0ea5c7'});screenFlash(Game,0.5);burst(Game,Game.player.x,Game.player.y,35,'#0ea5c7',350);
 }
 
-function tryDash(Game,dx,dy){const p=Game.player;if(!p.dashUnlocked||p.dashCd>0)return;if(!dx&&!dy)return;const mag=Math.hypot(dx,dy);p.dashDX=dx/mag;p.dashDY=dy/mag;p.dashT=0.16;p.dashCd=2.6 * Game.stats.dashCdMul;p.invuln=0.24;burst(Game,p.x,p.y,16,'#0ea5c7',250);screenShake(Game,3);}
+function tryDash(Game,dx,dy){
+  const p=Game.player;if(!p.dashUnlocked||p.dashCd>0)return;if(!dx&&!dy)return;
+  const mag=Math.hypot(dx,dy);p.dashDX=dx/mag;p.dashDY=dy/mag;p.dashT=0.16;p.dashCd=2.6 * Game.stats.dashCdMul;p.invuln=0.24;
+  burst(Game,p.x,p.y,16,'#0ea5c7',250);screenShake(Game,3);
+  if (typeof updateContractsDash === 'function') updateContractsDash();
+}
 function updatePlayerMove(Game,dt,mx,my){
   const p=Game.player;
   const oldX = p.x, oldY = p.y;
@@ -157,6 +166,7 @@ function updateBullets(Game,sdt){
         const pdmg = 10 * Game.stats.dmgTakenMul;
         p.hp -= pdmg;
         p.invuln=1.2;
+        if (typeof updateContractsDamageTaken === 'function') updateContractsDamageTaken();
         playSoundHit(false);
         spawnFloatingText(Game,p.x,p.y-20,'-'+Math.round(pdmg*10)/10,'#d92638');
         burst(Game,p.x,p.y,30,'#d92638',300);
@@ -217,9 +227,24 @@ const Game={
     const score=this.kills*15+(this.level+1)*300+this.wave*25;
 
     let earnedShards = Math.floor(this.kills * 0.5) + (this.wave * 2) + (this.level * 20);
+
+    let contractsBonusRatio = 0;
+    if (typeof activeContracts !== 'undefined' && activeContracts) {
+      const completed = activeContracts.filter(c => c.status === 'completed').length;
+      contractsBonusRatio = completed * 0.15;
+    }
+
     if (this.isEvac) {
       earnedShards = Math.floor(earnedShards * 1.3); // +30% bonus for evacuation
     }
+
+    if (contractsBonusRatio > 0) {
+      earnedShards = Math.floor(earnedShards * (1 + contractsBonusRatio));
+      this.lastContractsBonus = (contractsBonusRatio * 100).toFixed(0);
+    } else {
+      this.lastContractsBonus = 0;
+    }
+
     metaState.shards += earnedShards;
     saveMeta();
     this.lastEarnedShards = earnedShards;
@@ -235,6 +260,7 @@ const Game={
     onBossDefeated(){
     this.portal = { x: this.player.x, y: this.player.y - 100 };
     this.portalTimer = 25; // 25 seconds soft timer
+    this.portalNotified = false;
     spawnBanner(this, {title:'ПОРТАЛ ОТКРЫТ',subtitle:'ВЫБЕРИ СВОЙ ПУТЬ',color:'#0ea5c7'});
   },
   start(){
@@ -259,17 +285,36 @@ const Game={
       } else if(Input.cmd){
         if (document.getElementById('upgrades-menu').style.display !== 'none') {
           document.getElementById('upgrades-menu').style.display = 'none';
+        } else if (document.getElementById('contracts-menu').style.display !== 'none') {
+          // ignore, wait for UI interaction
         } else {
-          this.start();
+          showContractsMenu();
         }
       }
       Input.cmd=false;
       return;
     }
     if(this.state==='loot-compare'){return;}
+    if(this.state==='inventory'){
+      if(Input.wantInventory || Input.keys['Escape']) {
+        document.getElementById('inventory-menu').style.display = 'none';
+        this.state = 'play';
+        Input.wantInventory = false;
+        Input.keys['Escape'] = false;
+      }
+      return;
+    }
     if(this.state==='enter-name')return;
     if(this.state==='death'){
-      if(Input.cmd)this.start();Input.cmd=false;
+      if(Input.cmd) {
+        if (typeof resetContractsState === 'function') resetContractsState();
+        if (typeof showContractsMenu === 'function') {
+          showContractsMenu();
+        } else {
+          this.start();
+        }
+      }
+      Input.cmd=false;
       for(let i=0;i<this.particles.length;i++){const pt=this.particles[i];pt.x+=pt.vx*dt;pt.y+=pt.vy*dt;pt.life-=dt;if(pt.gravity)pt.vy+=pt.gravity*dt;}
       compactByLife(this.particles);return;
     }
@@ -303,12 +348,17 @@ const Game={
     p.cd=Math.max(0,p.cd-dt);
     if(p.reloading>0){p.reloading-=dt;if(p.reloading<=0)p.ammo=WEAPONS[p.weaponId].ammoMax;}
     if(Input.wantReload){reloadWeapon(this);Input.wantReload=false;}
+    if(Input.wantInventory){showInventoryMenu();Input.wantInventory=false;}
     const mw={x:Input.mouse.x+this.camera.x,y:Input.mouse.y+this.camera.y};
     if(Input.fireReq){fireWeapon(this,mw.x,mw.y);if(!WEAPONS[p.weaponId].auto)Input.fireReq=false;}
     this.scaleT-=dt;
     if(this.scaleT<=0){this.scaleT=5;this.globalPower=Math.min(4.5,this.globalPower*1.11);}
     maybeUnlockWeapon(this);maybeUnlockDash(this);
-    if(!this.boss && !this.portal && this.wave % 5 === 0 && !this.bossSpawnedThisWave){this.bossSpawnedThisWave = true; spawnBoss(this);}
+    if(!this.boss && !this.portal && this.wave % 5 === 0 && !this.bossSpawnedThisWave){
+      this.bossSpawnedThisWave = true;
+      spawnBoss(this);
+      if (typeof checkContractsOnBossSpawn === 'function') checkContractsOnBossSpawn();
+    }
     else if(!this.boss && !this.portal){
       this.spawnT-=sdt;
       const effectiveWave = Math.min(20, this.wave);
@@ -316,8 +366,14 @@ const Game={
       if(this.spawnT<=0&&this.enemies.length<cap){this.spawnT=Math.max(0.8,1.8-effectiveWave*0.08-(this.globalPower-1)*0.1);spawnEnemy(this);}
     }
     updateEnemies(this,sdt);updateBullets(this,sdt);
+    if (typeof updateContractsTimer === 'function') updateContractsTimer(dt);
+    if (typeof updateRadio === 'function') updateRadio(dt);
 
     if (this.portal && (this.state === 'play' || this.state === 'portal')) {
+      if (!this.portalNotified) {
+        if (typeof checkContractsOnPortalSpawn === 'function') checkContractsOnPortalSpawn();
+        this.portalNotified = true;
+      }
       this.portalTimer -= dt; this.portalTriggerCd = Math.max(0, (this.portalTriggerCd || 0) - dt);
       if (this.portalTimer <= 0) {
         this.portal = null;
@@ -360,9 +416,13 @@ const Game={
             const maxSlots = 4 + metaState.extraSlot;
             if (this.inventory.length < maxSlots) {
               this.inventory.push(l.item);
+              if (typeof checkContractsOnLootPicked === 'function') checkContractsOnLootPicked();
               this.stats = this.recalcStats();
               spawnBanner(this, {title: l.item.rarity.toUpperCase(), subtitle: l.item.pos.name + ' & ' + l.item.neg.name, color: l.item.color});
               burst(this, p.x, p.y, 30, l.item.color, 250);
+              if (l.item.rarity === 'legendary' && Math.random() < 0.3) {
+                if (typeof queueRadioMessage === 'function') queueRadioMessage('legendary');
+              }
             } else {
               this.pendingLoot = l.item;
               this.state = 'loot-compare';
@@ -392,6 +452,8 @@ const Game={
     drawWorldEntities();
     ctx.restore();
     drawHud();drawMinimap();
+    if (typeof drawContractsHUD === 'function') drawContractsHUD(ctx, this);
+    if (typeof drawRadioHUD === 'function') drawRadioHUD(ctx, this);
     this.flash=Math.max(0,(this.flash||0)-0.033*3);
     if(this.flash>0.01){
       ctx.fillStyle='rgba(255,255,255,'+(this.flash*0.6)+')';
@@ -417,6 +479,7 @@ const Game={
     window.addEventListener('orientationchange',()=>setTimeout(resize,150));
     initInput(canvas);
     wireNameEntry();
+    if (typeof initContractsUI === 'function') initContractsUI();
     requestAnimationFrame(t=>this.loop(t));
   }
 };

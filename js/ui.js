@@ -34,9 +34,45 @@ function updateLootCompareUI() {
   }
 }
 
+function showInventoryMenu() {
+  if (Game.state !== 'play' && Game.state !== 'portal') return;
+
+  Game.state = 'inventory';
+  document.getElementById('inventory-menu').style.display = 'flex';
+
+  const list = document.getElementById('inventory-list');
+  list.innerHTML = '';
+
+  if (Game.inventory.length === 0) {
+    list.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Инвентарь пуст</div>';
+    return;
+  }
+
+  for (let i = 0; i < Game.inventory.length; i++) {
+    const item = Game.inventory[i];
+    if (!item) continue;
+
+    const el = document.createElement('div');
+    el.style.cssText = `border: 2px solid ${item.color}; border-radius: 6px; padding: 12px; display: flex; gap: 16px; align-items: center; background: #faf8f4;`;
+    el.innerHTML = `
+      <div style="font-size:32px; color:${item.color}; border: 1px solid ${item.color}; border-radius:4px; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">${item.icon}</div>
+      <div style="flex:1;">
+        <div style="font-weight:bold; color:${item.color};">${LOOT_RARITY[item.rarity].name.toUpperCase()}</div>
+        <div style="font-size:12px; color:#10b981;">+ ${item.pos.text}</div>
+        <div style="font-size:12px; color:#d92638;">- ${item.neg.text}</div>
+      </div>
+    `;
+    list.appendChild(el);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-upgrades-close').onclick = () => {
     document.getElementById('upgrades-menu').style.display = 'none';
+  };
+  document.getElementById('btn-inventory-close').onclick = () => {
+    document.getElementById('inventory-menu').style.display = 'none';
+    Game.state = 'play';
   };
   document.getElementById('btn-loot-skip').onclick = () => {
     document.getElementById('loot-compare').style.display = 'none';
@@ -49,6 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
       Game.stats = Game.recalcStats();
       spawnBanner(Game, {title: 'ПРЕДМЕТ ЭКИПИРОВАН', subtitle: '', color: Game.pendingLoot.color});
       burst(Game, Game.player.x, Game.player.y, 30, Game.pendingLoot.color, 250);
+      if (Game.pendingLoot.rarity === 'legendary' && Math.random() < 0.3) {
+        if (typeof queueRadioMessage === 'function') queueRadioMessage('legendary');
+      }
     }
     document.getElementById('loot-compare').style.display = 'none';
     Game.pendingLoot = null;
@@ -105,7 +144,7 @@ function spawnBannerLevelUp(Game,cfg){
 function drawHud(){
 
   const hudContainer = document.getElementById('hud-inventory');
-  if (Game.state === 'play' || Game.state === 'loot-compare') {
+  if (Game.state === 'play' || Game.state === 'loot-compare' || Game.state === 'inventory') {
     let html = '';
     const maxSlots = 4 + metaState.extraSlot;
     for(let i=0; i<maxSlots; i++) {
@@ -113,12 +152,15 @@ function drawHud(){
         const item = Game.inventory[i];
         const isLeg = item.rarity === 'legendary';
         const pulse = isLeg ? 'box-shadow: 0 0 10px '+item.color+'; animation: pulse 1s infinite alternate;' : '';
-        html += '<div style="width:32px; height:32px; border:2px solid '+item.color+'; border-radius:4px; display:flex; align-items:center; justify-content:center; color:'+item.color+'; background:rgba(26,26,26,0.5); font-size:18px; text-shadow: 0 0 4px '+item.color+'; ' + pulse + '">' + item.icon + '</div>';
+        html += '<div style="width:32px; height:32px; border:2px solid '+item.color+'; border-radius:4px; display:flex; align-items:center; justify-content:center; color:'+item.color+'; background:rgba(26,26,26,0.5); font-size:18px; text-shadow: 0 0 4px '+item.color+'; ' + pulse + '; pointer-events:auto; cursor:pointer;" onclick="if(typeof Input !== \'undefined\') Input.wantInventory=true;">' + item.icon + '</div>';
       } else {
-        html += '<div style="width:32px; height:32px; border:1px solid rgba(26,26,26,0.3); border-radius:4px; background:rgba(0,0,0,0.1);"></div>';
+        html += '<div style="width:32px; height:32px; border:1px solid rgba(26,26,26,0.3); border-radius:4px; background:rgba(0,0,0,0.1); pointer-events:auto; cursor:pointer;" onclick="if(typeof Input !== \'undefined\') Input.wantInventory=true;"></div>';
       }
     }
-    if(hudContainer && hudContainer.innerHTML !== html) hudContainer.innerHTML = html;
+    if(hudContainer && hudContainer.innerHTML !== html) {
+        hudContainer.innerHTML = html;
+        hudContainer.style.pointerEvents = 'auto';
+    }
   } else if(hudContainer) {
     hudContainer.innerHTML = '';
   }
@@ -228,7 +270,11 @@ function drawDeathScreen(){
   ctx.fillStyle='#5a5a5a';ctx.font=ss+'px monospace';
   ctx.fillText('Убито: '+Game.kills+' · Волна: '+Game.wave+' · Этаж: '+(Game.level+1),Game.viewW/2,Game.viewH*0.32+ts*0.6);
   ctx.fillStyle='#0ea5c7';ctx.font='bold '+(ss+2)+'px monospace';
-  ctx.fillText('ПОЛУЧЕНО ОСКОЛКОВ: +'+(Game.lastEarnedShards||0),Game.viewW/2,Game.viewH*0.32+ts*0.85);
+  let shardsText = 'ПОЛУЧЕНО ОСКОЛКОВ: +'+(Game.lastEarnedShards||0);
+  if (Game.lastContractsBonus && Game.lastContractsBonus > 0) {
+    shardsText += ` (ВКЛЮЧАЯ БОНУС КОНТРАКТОВ +${Game.lastContractsBonus}%)`;
+  }
+  ctx.fillText(shardsText,Game.viewW/2,Game.viewH*0.32+ts*0.85);
   ctx.fillStyle='#e8a317';ctx.shadowColor='#e8a317';ctx.shadowBlur=6;
   ctx.font=ss+'px monospace';
   ctx.fillText('КЛИК / ТАП / ENTER заново',Game.viewW/2,Game.viewH*0.32+ts*1.15);
