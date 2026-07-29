@@ -82,10 +82,19 @@ function createPlayer(spawn){
   };
 }
 
-function applyLevelStart(Game){
-  const cfg=getLevelConfig(Game.level);
-  Game.levelCfg=cfg;Game.wave=1;Game.spawnT=0.5;Game.globalPower=1;Game.scaleT=5;Game.boss=null;
-  Game.player.weaponId=cfg.weaponOrder[0];const w=WEAPONS[Game.player.weaponId];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
+function applyLevelStart(Game, isContinuation = false){
+  const cfg=getLevelConfig(Game.level, Game.wave || 1);
+  Game.levelCfg=cfg;
+  if (!isContinuation) { Game.wave=1; Game.globalPower=1; }
+  Game.bossSpawnedThisWave=false;Game.spawnT=0.5;Game.scaleT=5;Game.boss=null;Game.portal=null;Game.portalTimer=0;
+  Game.floorIndex = Game.level;
+  applyFloorPalette(Game.floorIndex);
+
+
+  if (!isContinuation) {
+    Game.player.weaponId=cfg.weaponOrder[0];const w=WEAPONS[Game.player.weaponId];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
+  }
+
 }
 
 function maybeUnlockDash(Game){
@@ -199,13 +208,18 @@ const Game={
     return s;
   },
   die(){
-    if(this.state!=='play')return;
+    if(this.state==='death')return;
+    if(this.state!=='play' && this.state!=='portal')return;
     this.state='death';
+    document.getElementById('portal-ui').style.display = 'none';
     burst(this,this.player.x,this.player.y,50,'#d92638',600,200);
     screenFlash(this,1.0);screenShake(this,12);
     const score=this.kills*15+(this.level+1)*300+this.wave*25;
 
     let earnedShards = Math.floor(this.kills * 0.5) + (this.wave * 2) + (this.level * 20);
+    if (this.isEvac) {
+      earnedShards = Math.floor(earnedShards * 1.3); // +30% bonus for evacuation
+    }
     metaState.shards += earnedShards;
     saveMeta();
     this.lastEarnedShards = earnedShards;
@@ -218,16 +232,20 @@ const Game={
       setTimeout(()=>el.focus(),50);
     }
   },
-  onBossDefeated(){this.level++;applyLevelStart(this);spawnBannerLevelUp(this,this.levelCfg);},
+    onBossDefeated(){
+    this.portal = { x: this.player.x, y: this.player.y - 100 };
+    this.portalTimer = 25; // 25 seconds soft timer
+    spawnBanner(this, {title:'ПОРТАЛ ОТКРЫТ',subtitle:'ВЫБЕРИ СВОЙ ПУТЬ',color:'#0ea5c7'});
+  },
   start(){
     initAudio();
-    this.state='play';this.level=0;this.kills=0;
+    this.state='play';this.level=0;this.kills=0;this.isEvac=false;
     this.enemies=[];this.bullets=[];this.particles=[];this.banners=[];this.floatTexts=[];this.impacts=[];this.loot=[]; this.inventory=[];
     if (metaState.startItem > 0) this.inventory.push(generateLootItem('common'));
     this.stats=this.recalcStats();
     this.map=generateMap();this.player=createPlayer(this.map.spawnWorld); this.stats=this.recalcStats();
     this.player.hp = this.player.maxHp;
-    applyLevelStart(this);
+    applyLevelStart(this, false);
     this.camera.x=clamp(this.player.x-this.viewW/2,0,Math.max(0,this.map.pxW-this.viewW));
     this.camera.y=clamp(this.player.y-this.viewH/2,0,Math.max(0,this.map.pxH-this.viewH));
     Input.cmd=false;
@@ -290,13 +308,37 @@ const Game={
     this.scaleT-=dt;
     if(this.scaleT<=0){this.scaleT=5;this.globalPower=Math.min(4.5,this.globalPower*1.11);}
     maybeUnlockWeapon(this);maybeUnlockDash(this);
-    if(!this.boss&&this.wave>=this.levelCfg.bossWave){spawnBoss(this);}
-    else if(!this.boss){
+    if(!this.boss && !this.portal && this.wave % 5 === 0 && !this.bossSpawnedThisWave){this.bossSpawnedThisWave = true; spawnBoss(this);}
+    else if(!this.boss && !this.portal){
       this.spawnT-=sdt;
-      const cap=Math.min(25,10+this.wave*2);
-      if(this.spawnT<=0&&this.enemies.length<cap){this.spawnT=Math.max(1.0,1.8-this.wave*0.08-(this.globalPower-1)*0.1);spawnEnemy(this);}
+      const effectiveWave = Math.min(20, this.wave);
+      const cap=Math.min(25,10+effectiveWave*2);
+      if(this.spawnT<=0&&this.enemies.length<cap){this.spawnT=Math.max(0.8,1.8-effectiveWave*0.08-(this.globalPower-1)*0.1);spawnEnemy(this);}
     }
     updateEnemies(this,sdt);updateBullets(this,sdt);
+
+    if (this.portal && (this.state === 'play' || this.state === 'portal')) {
+      this.portalTimer -= dt; this.portalTriggerCd = Math.max(0, (this.portalTriggerCd || 0) - dt);
+      if (this.portalTimer <= 0) {
+        this.portal = null;
+        spawnFloatingText(this, this.player.x, this.player.y - 40, 'ПОРТАЛ ЗАКРЫТ', '#888');
+        if (this.state === 'portal') {
+          this.state = 'play';
+          document.getElementById('portal-ui').style.display = 'none';
+        }
+      } else {
+        const distToPortal = Math.hypot(this.player.x - this.portal.x, this.player.y - this.portal.y);
+        if (distToPortal < 50) {
+          if ((this.portalTriggerCd || 0) <= 0) {
+            this.state = 'portal';
+            document.getElementById('portal-ui').style.display = 'flex';
+            Input.cmd = false; Input.fireReq = false;
+          }
+        }
+      }
+    }
+
+
 
 
     // Подбор предметов
@@ -380,8 +422,12 @@ const Game={
 };
 
 function drawMap(cam,vw,vh){
-  ctx.fillStyle='#e8e2d6';
+
+  const floor = FLOORS[Game.floorIndex % FLOORS.length];
+  const p = floor ? floor.palette : {};
+  ctx.fillStyle=p.mapBg||'#e8e2d6';
   ctx.fillRect(cam.x-4,cam.y-4,vw+8,vh+8);
+
   const map=Game.map;
   const tx0=Math.max(0,Math.floor(cam.x/TILE)-1);
   const ty0=Math.max(0,Math.floor(cam.y/TILE)-1);
@@ -392,11 +438,11 @@ function drawMap(cam,vw,vh){
       const wall=map.grid[map.idx(tx,ty)]===1;
       const x=tx*TILE,y=ty*TILE;
       if(wall){
-        ctx.fillStyle=(tx+ty)%2===0?'#c4b8a8':'#b8aa98';
+        ctx.fillStyle=(tx+ty)%2===0?(p.mapWall1||'#c4b8a8'):(p.mapWall2||'#b8aa98');
         ctx.fillRect(x,y,TILE,TILE);
-        ctx.strokeStyle='rgba(100,80,60,0.25)';ctx.strokeRect(x+1,y+1,TILE-2,TILE-2);
+        ctx.strokeStyle=p.mapStroke||'rgba(100,80,60,0.25)';ctx.strokeRect(x+1,y+1,TILE-2,TILE-2);
       }else{
-        ctx.fillStyle=(tx+ty)%2===0?'#f0ebe0':'#ebe5d8';
+        ctx.fillStyle=(tx+ty)%2===0?(p.mapFloor1||'#f0ebe0'):(p.mapFloor2||'#ebe5d8');
         ctx.fillRect(x,y,TILE,TILE);
       }
     }
@@ -467,7 +513,7 @@ function drawWorldEntities(){
   const elist=Game.boss?Game.enemies.concat([Game.boss]):Game.enemies;
   for(let i=0;i<elist.length;i++){
     const e=elist[i];
-    const bc=e.isBoss?'#d92638':e.type==='shooter'?'#b829dd':e.type==='tank'?'#5a3a86':e.type==='kamikaze'?'#d97706':e.type==='sniper'?'#ff00ff':'#d92638';
+    const bc=e.isHeart?'#ff0000':e.isBoss?'#d92638':e.type==='shooter'?'#b829dd':e.type==='tank'?'#5a3a86':e.type==='kamikaze'?'#d97706':e.type==='sniper'?'#ff00ff':'#d92638';
     if(e.flash>0){
       ctx.shadowColor='#fff';ctx.shadowBlur=20;
       ctx.fillStyle='rgba(255,255,255,'+(e.flash*0.8)+')';
@@ -475,7 +521,7 @@ function drawWorldEntities(){
     }else{
       const ag=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*2);
       ag.addColorStop(0,bc+'44');ag.addColorStop(1,bc+'00');
-      ctx.fillStyle=ag;ctx.beginPath();ctx.arc(e.x,e.y,e.r*2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=ag;ctx.beginPath();ctx.arc(e.x,e.y,e.isHeart ? e.r*(1.5+Math.sin(Date.now()/150)*0.2)*2 : e.r*2,0,Math.PI*2);ctx.fill();
     }
     ctx.shadowBlur=0;
     ctx.fillStyle=e.flash>0?'#fff':bc;
@@ -490,6 +536,28 @@ function drawWorldEntities(){
       ctx.fillRect(e.x-w/2,e.y-e.r-14,w*(e.hp/e.maxHp),6);
     }
   }
+
+
+  if(Game.portal) {
+    const px = Game.portal.x, py = Game.portal.y;
+    const pt = Date.now() / 200;
+    ctx.shadowBlur = 20 + Math.sin(pt)*10;
+    ctx.shadowColor = '#0ea5c7';
+    ctx.strokeStyle = '#0ea5c7';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(px, py, 40, 20 + Math.sin(pt)*5, 0, 0, Math.PI*2); ctx.stroke();
+
+    ctx.fillStyle = 'rgba(14,165,199,0.3)';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Draw timer
+    ctx.fillStyle = '#0ea5c7';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.ceil(Game.portalTimer) + 'С', px, py - 30);
+  }
+
 
   // 5. Отрисовка игрока и полоски HP
   const p=Game.player;

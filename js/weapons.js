@@ -32,7 +32,14 @@ function playSoundShoot(weaponId) {
 }
 
 function maybeUnlockWeapon(Game){
-  const cfg=Game.levelCfg,idx=cfg.weaponWaves.indexOf(Game.wave);if(idx===-1)return;
+
+  const floorWaves = Game.wave - (Game.floorIndex * 5);
+  // floorWaves represents how many waves the player has survived on THIS floor.
+  // It starts at 1, goes up to 5 (or more if they stay).
+  // We only unlock weapons for floorWaves 1 to 5.
+  if (floorWaves < 1 || floorWaves > 5) return;
+  const cfg=Game.levelCfg,idx=cfg.weaponWaves.indexOf(floorWaves);
+if(idx===-1)return;
   const wid=cfg.weaponOrder[idx];if(Game.player.weaponId===wid)return;
   Game.player.weaponId=wid;const w=WEAPONS[wid];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
   spawnBanner(Game,{title:'НОВОЕ ОРУЖИЕ',subtitle:w.icon+'  '+w.name.toUpperCase(),color:'#e8a317'});

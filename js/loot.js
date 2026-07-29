@@ -27,12 +27,28 @@ const AFFIXES_NEG = [
   { id: 'dmg_down', name: 'Слабость', val: -0.05, text: 'Урон -X%' }
 ];
 
-function generateLootItem(forcedRarity) {
+function generateLootItem(forcedRarity, floorIndex = 0) {
   let rarityId = forcedRarity;
   if (!rarityId) {
-    const r = Math.random() * 100;
+        let epicBonus = 0;
+    let legBonus = 0;
+    if (floorIndex > 0) {
+      const floor = FLOORS[floorIndex % FLOORS.length];
+      epicBonus = (floor.lootBonus || 0) * 100;
+      legBonus = (floor.lootBonus || 0) * 50;
+    }
+
+    // adjust weights temporarily
+    const tempRarity = JSON.parse(JSON.stringify(LOOT_RARITY));
+    tempRarity.epic.weight += epicBonus;
+    tempRarity.legendary.weight += legBonus;
+
+    let totalWeight = 0;
+    for (const key in tempRarity) totalWeight += tempRarity[key].weight;
+
+    const r = Math.random() * totalWeight;
     let sum = 0;
-    for (const [id, data] of Object.entries(LOOT_RARITY)) {
+    for (const [id, data] of Object.entries(tempRarity)) {
       sum += data.weight;
       if (r <= sum) { rarityId = id; break; }
     }
