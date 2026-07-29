@@ -21,7 +21,7 @@ canvas{display:block;background:var(--bg);cursor:crosshair;position:fixed;inset:
 .btn{position:absolute;width:clamp(52px,13vw,76px);height:clamp(52px,13vw,76px);background:rgba(220,210,190,0.6);border:2px solid var(--bone);color:var(--bone);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(16px,4.5vw,24px);font-weight:bold;pointer-events:auto;touch-action:none;}
 .btn:active{background:rgba(217,38,56,0.35);border-color:var(--blood);transform:scale(0.9);}
 .btn-reload{right:max(14px,3vw);bottom:max(14px,3vh);}
-.btn-dash{right:calc(max(14px,3vw) + clamp(58px,14vw,88px));bottom:max(14px,3vh);background:rgba(14,165,199,0.15);border-color:var(--cyan);}
+.btn-dash{right:calc(max(14px,3vw) + clamp(58px,14vw,88px));bottom:max(14px,3vh);background:rgba(14,165,199,0.15);border-color:var(--cyan);opacity:0.3;pointer-events:none;border-color:transparent;}
 .btn-dash:active{background:rgba(14,165,199,0.35);}
 
 .name-entry{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(245,240,232,0.92);z-index:20;}
@@ -589,7 +589,17 @@ function maybeUnlockWeapon(Game){
   screenFlash(Game,0.6);burst(Game,Game.player.x,Game.player.y,30,'#e8a317',300);
 }
 
-function maybeUnlockDash(Game){if(Game.player.dashUnlocked||Game.wave<5)return;Game.player.dashUnlocked=true;spawnBanner(Game,{title:'НОВЫЙ НАВЫК',subtitle:'РЫВОК: SHIFT / КНОПКА',color:'#0ea5c7'});screenFlash(Game,0.5);burst(Game,Game.player.x,Game.player.y,35,'#0ea5c7',350);}
+function maybeUnlockDash(Game){
+  if(Game.player.dashUnlocked||Game.wave<5)return;
+  Game.player.dashUnlocked=true;
+  const btnDash = document.getElementById('btn-dash');
+  if(btnDash){
+    btnDash.style.opacity = '1';
+    btnDash.style.pointerEvents = 'auto';
+    btnDash.style.borderColor = 'var(--cyan)';
+  }
+  spawnBanner(Game,{title:'НОВЫЙ НАВЫК',subtitle:'РЫВОК: SHIFT / КНОПКА',color:'#0ea5c7'});screenFlash(Game,0.5);burst(Game,Game.player.x,Game.player.y,35,'#0ea5c7',350);
+}
 
 function fireWeapon(Game,ax,ay){
   const p=Game.player,w=WEAPONS[p.weaponId];if(p.cd>0||p.ammo<=0||p.reloading>0)return;
@@ -605,19 +615,28 @@ function fireWeapon(Game,ax,ay){
 
 function reloadWeapon(Game){const p=Game.player,w=WEAPONS[p.weaponId];if(p.ammo<Math.max(1, w.ammoMax + Game.stats.ammoAdd)&&p.reloading<=0)p.reloading=w.reload*Game.stats.reloadMul;}
 function tryDash(Game,dx,dy){const p=Game.player;if(!p.dashUnlocked||p.dashCd>0)return;if(!dx&&!dy)return;const mag=Math.hypot(dx,dy);p.dashDX=dx/mag;p.dashDY=dy/mag;p.dashT=0.16;p.dashCd=2.6 * Game.stats.dashCdMul;p.invuln=0.24;burst(Game,p.x,p.y,16,'#0ea5c7',250);screenShake(Game,3);}
-function updatePlayerMove(Game,dt,mx,my){const p=Game.player;p.dashCd=Math.max(0,p.dashCd-dt);p.invuln=Math.max(0,p.invuln-dt);let moving=false;if(p.dashT>0){p.dashT-=dt;moveWithCollision(Game.map,p,p.dashDX*900*dt,p.dashDY*900*dt);moving=true;}else if(mx||my){const mag=Math.hypot(mx,my);const walkMul = Input.wantWalk ? 0.5 : 1.0; moveWithCollision(Game.map,p,(mx/mag)*p.speed*walkMul*Game.stats.speedMul*dt,(my/mag)*p.speed*walkMul*Game.stats.speedMul*dt);moving=true;}return moving;}
+function updatePlayerMove(Game,dt,mx,my){
+  const p=Game.player;
+  const oldX = p.x, oldY = p.y;
+  p.dashCd=Math.max(0,p.dashCd-dt);p.invuln=Math.max(0,p.invuln-dt);
+  let moving=false;
+  if(p.dashT>0){p.dashT-=dt;moveWithCollision(Game.map,p,p.dashDX*900*dt,p.dashDY*900*dt);moving=true;}
+  else if(mx||my){const mag=Math.hypot(mx,my);const walkMul = Input.wantWalk ? 0.5 : 1.0; moveWithCollision(Game.map,p,(mx/mag)*p.speed*walkMul*Game.stats.speedMul*dt,(my/mag)*p.speed*walkMul*Game.stats.speedMul*dt);moving=true;}
+  if(dt > 0) { p.vx = (p.x - oldX) / dt; p.vy = (p.y - oldY) / dt; } else { p.vx = 0; p.vy = 0; }
+  return moving;
+}
 
 function spawnEnemy(Game){
   const cfg=Game.levelCfg,type=cfg.enemyTypes[Math.floor(Math.random()*cfg.enemyTypes.length)];
   const base=ENEMY_BASE[type];const vs=Math.max(Game.effViewW||Game.viewW,Game.effViewH||Game.viewH);
   const spot=randomFloorTileFar(Game.map,Game.player.x,Game.player.y,vs*0.7);const power=Math.min(4.5,Game.globalPower);
   const hp=Math.max(1,Math.round(base.hp*cfg.hpMul*power));
-  Game.enemies.push({x:spot.x,y:spot.y,r:base.r,type,hp,maxHp:hp,speed:base.speed*cfg.speedMul*Math.min(2.1,power),fireCd:base.fireCd||0,jitter:(Math.random()-0.5)*0.5,dead:false,flash:0});
+  Game.enemies.push({x:spot.x,y:spot.y,r:base.r,type,hp,maxHp:hp,speed:base.speed*cfg.speedMul*Math.min(2.1,power),fireCd:base.fireCd||0,jitter:(Math.random()-0.5)*0.5,dead:false,flash:0,targetOffsetX:0,targetOffsetY:0,offsetUpdateTimer:0,dodgeTimer:0,dodgeAng:0});
 }
 
 function spawnBoss(Game){
   const cfg=Game.levelCfg;const spot=randomFloorTileFar(Game.map,Game.player.x,Game.player.y,500);
-  Game.boss={x:spot.x,y:spot.y,r:46,hp:cfg.bossHp,maxHp:cfg.bossHp,speed:75*cfg.speedMul,burstCd:1.6,dead:false,flash:0,isBoss:true};
+  Game.boss={x:spot.x,y:spot.y,r:46,hp:cfg.bossHp,maxHp:cfg.bossHp,speed:75*cfg.speedMul,burstCd:1.6,dead:false,flash:0,isBoss:true,targetOffsetX:0,targetOffsetY:0,offsetUpdateTimer:0,dodgeTimer:0,dodgeAng:0};
   spawnBanner(Game,{title:'БОСС ПРИБЫЛ',subtitle:'ВЫЖИВИ',color:'#d92638'});screenFlash(Game,0.8);screenShake(Game,10);
 }
 
@@ -701,11 +720,67 @@ function updateEnemies(Game,sdt){
   const p=Game.player,list=Game.boss?Game.enemies.concat([Game.boss]):Game.enemies;
   for(let i=0;i<list.length;i++){
     const e=list[i];if(e.dead)continue;e.flash=Math.max(0,e.flash-sdt*5);
-    const ang=Math.atan2(p.y-e.y,p.x-e.x)+(e.jitter||0)*0.3;const c=Math.cos(ang),s=Math.sin(ang);
-    if(e.isBoss){moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);e.burstCd-=sdt;if(e.burstCd<=0){e.burstCd=2.2;for(let k=0;k<12;k++){const a=(k/12)*Math.PI*2;Game.bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,friendly:false,dmg:1,pierce:1,dead:false,color:'#d92638'});}}
-    }else if(e.type==='shooter'){const los=raycastClear(Game.map,e.x,e.y,p.x,p.y);const near=Math.hypot(p.x-e.x,p.y-e.y)<80;if(!los||!near)moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);e.fireCd-=sdt;if(e.fireCd<=0&&los){e.fireCd=ENEMY_BASE.shooter.fireCd;Game.bullets.push({x:e.x,y:e.y,vx:c*ENEMY_BASE.shooter.bulletSpeed,vy:s*ENEMY_BASE.shooter.bulletSpeed,r:6,friendly:false,dmg:1,pierce:1,dead:false,color:'#d92638'});}
-    }else if(e.type==='sniper'){const los=raycastClear(Game.map,e.x,e.y,p.x,p.y);const near=Math.hypot(p.x-e.x,p.y-e.y)<200;if(!los||!near){moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);}else if(Math.hypot(p.x-e.x,p.y-e.y)<100){moveWithCollision(Game.map,e,-c*e.speed*sdt,-s*e.speed*sdt);}e.fireCd-=sdt;if(e.fireCd<=0&&los){e.fireCd=ENEMY_BASE.sniper.fireCd;Game.bullets.push({x:e.x,y:e.y,vx:c*ENEMY_BASE.sniper.bulletSpeed,vy:s*ENEMY_BASE.sniper.bulletSpeed,r:4,friendly:false,dmg:1,pierce:1,dead:false,color:'#ff00ff'});}
-    }else{moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);}
+
+    e.offsetUpdateTimer -= sdt;
+    if(e.offsetUpdateTimer <= 0) {
+      e.targetOffsetX = (Math.random() - 0.5) * 80;
+      e.targetOffsetY = (Math.random() - 0.5) * 80;
+      e.offsetUpdateTimer = 1.0 + Math.random();
+    }
+    const targetX = p.x + e.targetOffsetX;
+    const targetY = p.y + e.targetOffsetY;
+    let dodgeAng = null;
+    if(e.dodgeTimer > 0) {
+      e.dodgeTimer -= sdt;
+      dodgeAng = e.dodgeAng;
+    }
+
+    let ang = Math.atan2(targetY-e.y,targetX-e.x)+(e.jitter||0)*0.3;
+    if (dodgeAng !== null) {
+      ang = dodgeAng;
+    }
+    const c=Math.cos(ang),s=Math.sin(ang);
+
+    const oldX = e.x, oldY = e.y;
+    let attemptedMove = false;
+
+    if(e.isBoss){attemptedMove=true;moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);e.burstCd-=sdt;if(e.burstCd<=0){e.burstCd=2.2;for(let k=0;k<12;k++){const a=(k/12)*Math.PI*2;Game.bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,friendly:false,dmg:1,pierce:1,dead:false,color:'#d92638'});}}
+    }else if(e.type==='shooter'){
+      const los=raycastClear(Game.map,e.x,e.y,p.x,p.y);const dist=Math.hypot(p.x-e.x,p.y-e.y);const near=dist<80;
+      const flee = e.hp < e.maxHp * 0.3;
+      if(flee && dist < 200){
+        attemptedMove=true;moveWithCollision(Game.map,e,-c*e.speed*sdt,-s*e.speed*sdt);
+      } else if(!los||!near){
+        attemptedMove=true;moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);
+      }
+      e.fireCd-=sdt;
+      if(e.fireCd<=0&&los){
+        e.fireCd=ENEMY_BASE.shooter.fireCd;
+        const leadTime = dist / ENEMY_BASE.shooter.bulletSpeed;
+        const predX = p.x + (p.vx || 0) * leadTime;
+        const predY = p.y + (p.vy || 0) * leadTime;
+        const shootAng = Math.atan2(predY-e.y, predX-e.x) + (e.jitter||0)*0.3;
+        Game.bullets.push({x:e.x,y:e.y,vx:Math.cos(shootAng)*ENEMY_BASE.shooter.bulletSpeed,vy:Math.sin(shootAng)*ENEMY_BASE.shooter.bulletSpeed,r:6,friendly:false,dmg:1,pierce:1,dead:false,color:'#d92638'});
+      }
+    }else if(e.type==='sniper'){
+      const los=raycastClear(Game.map,e.x,e.y,p.x,p.y);const near=Math.hypot(p.x-e.x,p.y-e.y)<200;
+      if(!los||!near){attemptedMove=true;moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);}
+      else if(Math.hypot(p.x-e.x,p.y-e.y)<100){attemptedMove=true;moveWithCollision(Game.map,e,-c*e.speed*sdt,-s*e.speed*sdt);}
+      e.fireCd-=sdt;
+      if(e.fireCd<=0&&los){
+        e.fireCd=ENEMY_BASE.sniper.fireCd;
+        const sniperAng = Math.atan2(p.y-e.y, p.x-e.x);
+        Game.bullets.push({x:e.x,y:e.y,vx:Math.cos(sniperAng)*ENEMY_BASE.sniper.bulletSpeed,vy:Math.sin(sniperAng)*ENEMY_BASE.sniper.bulletSpeed,r:4,friendly:false,dmg:1,pierce:1,dead:false,color:'#ff00ff'});
+      }
+    }else{attemptedMove=true;moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);}
+
+    if (attemptedMove && (!e.dodgeTimer || e.dodgeTimer <= 0)) {
+      const movedDist = Math.hypot(e.x - oldX, e.y - oldY);
+      if (movedDist < e.speed * sdt * 0.1) {
+        e.dodgeTimer = 0.5 + Math.random() * 0.5;
+        e.dodgeAng = Math.atan2(targetY-e.y,targetX-e.x) + (Math.random() < 0.5 ? Math.PI/2 : -Math.PI/2);
+      }
+    }
     
     const rr=e.r+p.r;
     if(p.invuln<=0&&Math.hypot(e.x-p.x,e.y-p.y)<rr){
@@ -1177,6 +1252,7 @@ function drawHud(){
 
   ctx.fillStyle=Game.timeScale<=0.1?'#888':'#e8a317';
   ctx.fillText(Game.timeScale<=0.1?'◆ СТОП':'▶ ХОД',Game.viewW-22,Game.viewH-48);
+
   if(p.dashUnlocked){
     ctx.fillStyle=p.dashCd>0?'#999':'#0ea5c7';
     ctx.fillText(p.dashCd>0?'РЫВОК '+p.dashCd.toFixed(1)+'с':'РЫВОК ГОТОВ',Game.viewW-22,Game.viewH-24);
