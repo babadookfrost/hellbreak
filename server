@@ -12,8 +12,8 @@ const wss = new WebSocket.Server({ server });
 
 // ---------- Вспомогательные функции ----------
 
-function dist(x1, y1, x2, y2) {
-    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+function distSq(x1, y1, x2, y2) {
+    return (x2 - x1) ** 2 + (y2 - y1) ** 2;
 }
 
 const COLORS = [
@@ -145,7 +145,7 @@ class Room {
                 let target = null;
                 let minDist = Infinity;
                 for (const e of this.enemies) {
-                    const d = dist(p.x, p.y, e.x, e.y);
+                    const d = distSq(p.x, p.y, e.x, e.y);
                     if (d < minDist) {
                         minDist = d;
                         target = e;
@@ -185,7 +185,7 @@ class Room {
             for (let j = this.enemies.length - 1; j >= 0; j--) {
                 const e = this.enemies[j];
                 if (pr.hitEnemies.has(e)) continue;
-                if (dist(pr.x, pr.y, e.x, e.y) < pr.radius + e.radius) {
+                if (distSq(pr.x, pr.y, e.x, e.y) < (pr.radius + e.radius) ** 2) {
                     pr.hitEnemies.add(e);
                     e.hp -= pr.damage;
                     if (e.hp <= 0) {
@@ -210,7 +210,7 @@ class Room {
             let minDist = Infinity;
             for (const p of this.players.values()) {
                 if (!p.alive) continue;
-                const d = dist(e.x, e.y, p.x, p.y);
+                const d = distSq(e.x, e.y, p.x, p.y);
                 if (d < minDist) {
                     minDist = d;
                     nearest = p;
@@ -226,7 +226,7 @@ class Room {
             e.x += Math.cos(angle) * e.speed * dt;
             e.y += Math.sin(angle) * e.speed * dt;
 
-            if (minDist < e.radius + nearest.radius) {
+            if (minDist < (e.radius + nearest.radius) ** 2) {
                 nearest.hp -= e.damage;
                 e.x -= Math.cos(angle) * 30;
                 e.y -= Math.sin(angle) * 30;
@@ -254,8 +254,8 @@ class Room {
         for (const g of this.gems) {
             for (const p of this.players.values()) {
                 if (!p.alive) continue;
-                const d = dist(g.x, g.y, p.x, p.y);
-                if (d < p.pickupRadius) {
+                const d = distSq(g.x, g.y, p.x, p.y);
+                if (d < p.pickupRadius ** 2) {
                     const a = Math.atan2(p.y - g.y, p.x - g.x);
                     g.x += Math.cos(a) * 400 * dt;
                     g.y += Math.sin(a) * 400 * dt;
@@ -269,7 +269,7 @@ class Room {
             let picked = false;
             for (const p of this.players.values()) {
                 if (!p.alive) continue;
-                if (dist(g.x, g.y, p.x, p.y) < p.radius + g.radius) {
+                if (distSq(g.x, g.y, p.x, p.y) < (p.radius + g.radius) ** 2) {
                     p.xp += g.xp;
                     this.gems.splice(i, 1);
 
