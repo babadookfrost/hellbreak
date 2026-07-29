@@ -9,6 +9,7 @@ function initInput(canvas){
     if(e.code==='ShiftLeft'||e.code==='ShiftRight')Input.wantDash=true;
     if(e.code==='KeyR')Input.wantReload=true;
     if(e.code==='Enter'||e.code==='Space')Input.cmd=true;
+    if(e.code==='KeyI'||e.code==='Tab'){ e.preventDefault(); Input.wantInventory=true; }
   });
   window.addEventListener('keyup',e=>{Input.keys[e.code]=false;
     if(e.code==='KeyC'||e.code==='ControlLeft'||e.code==='ControlRight')Input.wantWalk=false;});
@@ -81,6 +82,7 @@ function initInput(canvas){
 
     document.getElementById('btn-reload').addEventListener('touchstart',e=>{Input.wantReload=true;},{passive:true});
     document.getElementById('btn-dash').addEventListener('touchstart',e=>{Input.dashDirX=Input.stick.dx||1;Input.dashDirY=Input.stick.dy||0;Input.wantDash=true;},{passive:true});
+    document.getElementById('btn-inventory').addEventListener('touchstart',e=>{Input.wantInventory=true;},{passive:true});
   }
 }
 

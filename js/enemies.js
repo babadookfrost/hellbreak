@@ -87,6 +87,7 @@ function killEnemy(Game,e){
       const pdmg = 20 * Game.stats.dmgTakenMul;
       p.hp -= pdmg;
       p.invuln = 1.2;
+      if (typeof updateContractsDamageTaken === 'function') updateContractsDamageTaken();
       playSoundHit(false);
       spawnFloatingText(Game,p.x,p.y-20,'-'+Math.round(pdmg*10)/10,'#d92638');
       screenFlash(Game, 0.5);
@@ -125,14 +126,18 @@ function killEnemy(Game,e){
     screenFlash(Game,1.0);screenShake(Game,15);
     spawnFloatingText(Game,e.x,e.y-40,e.isHeart ? 'СЕРДЦЕ ОСТАНОВЛЕНО' : 'BOSS SLAIN', e.isHeart ? '#ff0000' : '#e8a317');
     Game.loot.push({x: e.x, y: e.y, type: 'item', item: generateLootItem(Math.random() > 0.5 ? 'legendary' : 'epic', Game.floorIndex || 0), r: 10, t: 0}); Game.onBossDefeated();
+    if (typeof checkContractsOnBossKill === 'function') checkContractsOnBossKill(Game);
     return;
   }
 
   Game.kills++;
+  if (typeof checkContractsOnKill === 'function') checkContractsOnKill();
   burst(Game,e.x,e.y,14,e.type==='shooter'?'#b829dd':e.type==='tank'?'#5a3a86':'#d92638',280,100);
   spawnFloatingText(Game,e.x,e.y-15,'+1','#d92638');
   if(Game.kills%10===0){
+    if (typeof checkContractsOnWaveEnd === 'function') checkContractsOnWaveEnd();
     Game.wave++; Game.bossSpawnedThisWave=false;
+    if (typeof checkContractsOnWaveStart === 'function') checkContractsOnWaveStart(Game.wave);
     const item = generateLootItem(null, Game.floorIndex || 0, Game.floorIndex || 0);
     let lx = Game.player.x + (Math.random()-0.5)*40;
     let ly = Game.player.y + (Math.random()-0.5)*40;

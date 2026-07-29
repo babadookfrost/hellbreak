@@ -15,6 +15,8 @@ canvas{display:block;background:var(--bg);cursor:crosshair;position:fixed;inset:
 .btn-reload{right:max(14px,3vw);bottom:max(14px,3vh);}
 .btn-dash{right:calc(max(14px,3vw) + clamp(58px,14vw,88px));bottom:max(14px,3vh);background:rgba(14,165,199,0.15);border-color:var(--cyan);opacity:0.3;pointer-events:none;border-color:transparent;}
 .btn-dash:active{background:rgba(14,165,199,0.35);}
+.btn-inventory{right:max(14px,3vw);top:max(14px,3vh);background:rgba(232,163,23,0.15);border-color:var(--ind);}
+.btn-inventory:active{background:rgba(232,163,23,0.35);}
 
 .name-entry{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(245,240,232,0.92);z-index:20;}
 .name-entry form{display:flex;flex-direction:column;gap:16px;align-items:center;background:#fff;border:2px solid var(--ind);padding:36px 44px;border-radius:12px;max-width:90vw;box-shadow:0 4px 30px rgba(0,0,0,0.15);}
