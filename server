@@ -45,7 +45,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server, maxPayload: 8192 });
 
 // ---------- Вспомогательные функции ----------
 
@@ -494,6 +494,8 @@ const rooms = new Map();
 wss.on('connection', (ws) => {
     let playerRef = null;
     let roomRef = null;
+
+    ws.on('error', console.error);
 
     ws.on('message', (raw) => {
         try {
