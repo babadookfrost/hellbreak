@@ -1,5 +1,12 @@
 {
   "dependencies": {
     "ws": "^8.21.1"
+  },
+  "scripts": {
+    "test": "mocha server.test.js --exit"
+  },
+  "devDependencies": {
+    "chai": "^6.2.2",
+    "mocha": "^11.7.6"
   }
 }
