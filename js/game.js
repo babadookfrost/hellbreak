@@ -159,10 +159,40 @@ function updatePlayerMove(Game,dt,mx,my){
 function updateBullets(Game,sdt){
   const bullets=Game.bullets,targets=Game.boss?Game.enemies.concat([Game.boss]):Game.enemies;const tgrid=buildGrid(targets);
   for(let i=0;i<bullets.length;i++){
-    const b=bullets[i];b.x+=b.vx*sdt;b.y+=b.vy*sdt;
-    if(b.trail){b.trail.push({x:b.x,y:b.y});if(b.trail.length>8)b.trail.shift();}
-    if(isWallWorld(Game.map,b.x,b.y)){b.dead=true;if(b.splash){for(let j=0;j<targets.length;j++){const e=targets[j];if(e.dead)continue;if(Math.hypot(b.x-e.x,b.y-e.y)<b.splash){e.hp-=b.dmg;e.flash=1;if(e.hp<=0)killEnemy(Game,e);}}burst(Game,b.x,b.y,20,'#d97706',220,300);spawnImpact(Game,b.x,b.y,'#d97706',30);screenShake(Game,5);}else{burst(Game,b.x,b.y,5,'#888',80);spawnImpact(Game,b.x,b.y,'#1a1a1a',12);}continue;}
-    if(b.x<0||b.y<0||b.x>Game.map.pxW||b.y>Game.map.pxH){b.dead=true;}
+    const b=bullets[i];
+    b.x+=b.vx*sdt;
+    b.y+=b.vy*sdt;
+
+    if(b.trail){
+      b.trail.push({x:b.x,y:b.y});
+      if(b.trail.length>8) b.trail.shift();
+    }
+
+    if(isWallWorld(Game.map,b.x,b.y)){
+      b.dead=true;
+      if(b.splash){
+        for(let j=0;j<targets.length;j++){
+          const e=targets[j];
+          if(e.dead)continue;
+          if(Math.hypot(b.x-e.x,b.y-e.y)<b.splash){
+            e.hp-=b.dmg;
+            e.flash=1;
+            if(e.hp<=0) killEnemy(Game,e);
+          }
+        }
+        burst(Game,b.x,b.y,20,'#d97706',220,300);
+        spawnImpact(Game,b.x,b.y,'#d97706',30);
+        screenShake(Game,5);
+      }else{
+        burst(Game,b.x,b.y,5,'#888',80);
+        spawnImpact(Game,b.x,b.y,'#1a1a1a',12);
+      }
+      continue;
+    }
+
+    if(b.x<0||b.y<0||b.x>Game.map.pxW||b.y>Game.map.pxH){
+      b.dead=true;
+    }
 
     if (b.dead && b.isInferno) {
       if (!Game.zones) Game.zones = [];
@@ -173,22 +203,29 @@ function updateBullets(Game,sdt){
 
     if(b.friendly){
       forNearby(tgrid,b.x,b.y,e=>{
-        if(e.dead||b.dead)return;const rr=b.r+e.r;if(Math.hypot(b.x-e.x,b.y-e.y)<rr){
+        if(e.dead||b.dead)return;
+        const rr=b.r+e.r;
+        if(Math.hypot(b.x-e.x,b.y-e.y)<rr){
           // Check boss invulnerability
           if (e.isBoss && e.state === 'invulnerable') {
               spawnImpact(Game,b.x,b.y,'#0ea5c7',10);
-              b.pierce--; if(b.pierce<=0)b.dead=true;
+              b.pierce--;
+              if(b.pierce<=0)b.dead=true;
               spawnFloatingText(Game,e.x,e.y-30,'БЛОК','#0ea5c7');
               return;
           }
 
           const isCrit = GameRNG.random() < 0.15;
           const dmgDealt = isCrit ? b.dmg * 2 : b.dmg;
-          e.hp-=dmgDealt;e.flash=1;playSoundHit(isCrit);
+          e.hp-=dmgDealt;
+          e.flash=1;
+          playSoundHit(isCrit);
           if (isCrit) burst(Game, e.x, e.y, 30, '#e8a317', 400);
           spawnFloatingText(Game,e.x,e.y-20,(Math.round(dmgDealt*10)/10).toString(),isCrit?'#e8a317':'#fff');
-          spawnImpact(Game,b.x,b.y,b.color||'#1a1a1a',14);b.pierce--;
+          spawnImpact(Game,b.x,b.y,b.color||'#1a1a1a',14);
+          b.pierce--;
           if (b.isIce) e.iceSlow = 1.0;
+
           if (b.ricochet && !b.dead && b.pierce > 0) {
               // find new target
               let newTarget = null;
@@ -203,17 +240,22 @@ function updateBullets(Game,sdt){
                   const speed = Math.hypot(b.vx, b.vy);
                   b.vx = Math.cos(ang) * speed;
                   b.vy = Math.sin(ang) * speed;
-              } else { b.dead = true; } // No target, stop ricochet to save performance
+              } else {
+                  b.dead = true;
+              } // No target, stop ricochet to save performance
           } else {
-              if(b.pierce<=0)b.dead=true;
+              if(b.pierce<=0) b.dead=true;
           }
           if (b.isRailgun && b.dead) burst(Game, e.x, e.y, 40, '#0ea5c7', 500); // Railgun visual impact
-          if(e.hp<=0)killEnemy(Game,e);
+          if(e.hp<=0) killEnemy(Game,e);
         }
       });
+
       if(b.splash&&b.dead){
         for(let j=0;j<targets.length;j++){
-          const e=targets[j];if(e.dead)continue;if(Math.hypot(b.x-e.x,b.y-e.y)<b.splash){
+          const e=targets[j];
+          if(e.dead) continue;
+          if(Math.hypot(b.x-e.x,b.y-e.y)<b.splash){
             if (e.isBoss && e.state === 'invulnerable') {
                 spawnFloatingText(Game,e.x,e.y-30,'БЛОК','#0ea5c7');
                 continue;
@@ -221,18 +263,22 @@ function updateBullets(Game,sdt){
 
             const isCrit = GameRNG.random() < 0.15;
             const dmgDealt = isCrit ? b.dmg * 2 : b.dmg;
-            e.hp-=dmgDealt;e.flash=1;playSoundHit(isCrit);
+            e.hp-=dmgDealt;
+            e.flash=1;
+            playSoundHit(isCrit);
             if (isCrit) burst(Game, e.x, e.y, 30, '#e8a317', 400);
             spawnFloatingText(Game,e.x,e.y-20,(Math.round(dmgDealt*10)/10).toString(),isCrit?'#e8a317':'#fff');
             if (b.isIce) e.iceSlow = 1.0;
-            if(e.hp<=0)killEnemy(Game,e);
+            if(e.hp<=0) killEnemy(Game,e);
           }
         }
-        burst(Game,b.x,b.y,24,'#d97706',250,300);spawnImpact(Game,b.x,b.y,'#d97706',35);screenShake(Game,6);
+        burst(Game,b.x,b.y,24,'#d97706',250,300);
+        spawnImpact(Game,b.x,b.y,'#d97706',35);
+        screenShake(Game,6);
       }
     }else{
-      const p=Game.player,rr=b.r+p.r*0.5;
-      if(p.invuln<=0&&Math.hypot(b.x-p.x,b.y-p.y)<rr){
+      const p=Game.player, rr=b.r+p.r*0.5;
+      if(p.invuln<=0 && Math.hypot(b.x-p.x,b.y-p.y)<rr){
         b.dead=true;
         const pdmg = 10 * Game.stats.dmgTakenMul;
         p.hp -= pdmg;
@@ -241,7 +287,8 @@ function updateBullets(Game,sdt){
         playSoundHit(false);
         spawnFloatingText(Game,p.x,p.y-20,'-'+Math.round(pdmg*10)/10,'#d92638');
         burst(Game,p.x,p.y,30,'#d92638',300);
-        screenShake(Game,15);screenFlash(Game, 0.5);
+        screenShake(Game,15);
+        screenFlash(Game, 0.5);
         if(p.hp<=0) Game.die();
       }
     }
