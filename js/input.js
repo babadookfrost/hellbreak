@@ -15,14 +15,24 @@ function initInput(canvas){
   window.addEventListener('keyup',e=>{Input.keys[e.code]=false;
     if(e.code==='KeyC'||e.code==='ControlLeft'||e.code==='ControlRight')Input.wantWalk=false;});
 
-  const toScreen=(cx,cy)=>{return{x:cx,y:cy};};
+  const toScreen=(cx,cy)=>{
+    if(typeof Game !== 'undefined' && Game.scale) {
+      return {x: cx / (Game.scale / (window.devicePixelRatio || 1)), y: cy / (Game.scale / (window.devicePixelRatio || 1))};
+    }
+    return {x:cx,y:cy};
+  };
   canvas.addEventListener('mousemove',e=>{const p=toScreen(e.clientX,e.clientY);Input.mouse.x=p.x;Input.mouse.y=p.y;});
   canvas.addEventListener('mousedown',e=>{initAudio();const p=toScreen(e.clientX,e.clientY);Input.mouse.x=p.x;Input.mouse.y=p.y;Input.fireReq=true;Input.cmd=true;
     if (Game.state === 'menu') {
       const uw = 200, uh = 40;
       const ux = Game.viewW/2 - uw/2, uy = Game.viewH*0.75 - uh/2;
+      const sux = Game.viewW/2 - uw/2, suy = Game.viewH*0.75 + 50 - uh/2;
+
       if (Input.mouse.x >= ux && Input.mouse.x <= ux+uw && Input.mouse.y >= uy && Input.mouse.y <= uy+uh) {
         Input.clickUpgrades = true;
+        Input.cmd = false;
+      } else if (Input.mouse.x >= sux && Input.mouse.x <= sux+uw && Input.mouse.y >= suy && Input.mouse.y <= suy+uh) {
+        document.getElementById('settings-menu').style.display = 'flex';
         Input.cmd = false;
       } else if (window.dailyBtnRect && Input.mouse.x >= window.dailyBtnRect.x && Input.mouse.x <= window.dailyBtnRect.x+window.dailyBtnRect.w && Input.mouse.y >= window.dailyBtnRect.y && Input.mouse.y <= window.dailyBtnRect.y+window.dailyBtnRect.h) {
         Input.wantDaily = true;
@@ -32,6 +42,15 @@ function initInput(canvas){
   });
   canvas.addEventListener('mouseup',()=>{Input.fireReq=false;});
   window.addEventListener('contextmenu',e=>e.preventDefault());
+
+  window.addEventListener('wheel', (e) => {
+      if(!window.SettingsManager) return;
+      SettingsManager.zoom = Math.max(0.7, Math.min(SettingsManager.zoom - e.deltaY * 0.001, 1.3));
+      SettingsManager.save();
+      const el = document.getElementById('set-zoom');
+      if(el) el.value = SettingsManager.zoom;
+      if(typeof resize === 'function') resize();
+  });
 
   if(isMobile){
     document.getElementById('touch-ui').style.display='block';
@@ -43,16 +62,32 @@ function initInput(canvas){
 
     canvas.addEventListener('touchstart',e=>{
       initAudio();
+
+      if (e.touches.length >= 2) {
+          Input.initialPinchDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          Input.initialZoom = window.SettingsManager ? SettingsManager.zoom : 1.0;
+      } else {
+          Input.initialPinchDistance = null;
+          Input.initialZoom = null;
+      }
+
       for(let i=0;i<e.changedTouches.length;i++){
         const t=e.changedTouches[i];
         if(stickTouchId===null && isStickZone(t)){stickTouchId=t.identifier;updateStick(t);}
         else if(aimTouchId===null && t.identifier!==stickTouchId){
-          aimTouchId=t.identifier;Input.mouse.x=t.clientX;Input.mouse.y=t.clientY;Input.fireReq=true;Input.cmd=true;
+          aimTouchId=t.identifier;
+          const p = toScreen(t.clientX, t.clientY);
+          Input.mouse.x=p.x;Input.mouse.y=p.y;Input.fireReq=true;Input.cmd=true;
           if (Game.state === 'menu') {
             const uw = 200, uh = 40;
             const ux = Game.viewW/2 - uw/2, uy = Game.viewH*0.75 - uh/2;
+            const sux = Game.viewW/2 - uw/2, suy = Game.viewH*0.75 + 50 - uh/2;
+
             if (Input.mouse.x >= ux && Input.mouse.x <= ux+uw && Input.mouse.y >= uy && Input.mouse.y <= uy+uh) {
               Input.clickUpgrades = true;
+              Input.cmd = false;
+            } else if (Input.mouse.x >= sux && Input.mouse.x <= sux+uw && Input.mouse.y >= suy && Input.mouse.y <= suy+uh) {
+              document.getElementById('settings-menu').style.display = 'flex';
               Input.cmd = false;
             } else if (window.dailyBtnRect && Input.mouse.x >= window.dailyBtnRect.x && Input.mouse.x <= window.dailyBtnRect.x+window.dailyBtnRect.w && Input.mouse.y >= window.dailyBtnRect.y && Input.mouse.y <= window.dailyBtnRect.y+window.dailyBtnRect.h) {
               Input.wantDaily = true;
@@ -64,10 +99,23 @@ function initInput(canvas){
     },{passive:true});
 
     canvas.addEventListener('touchmove',e=>{
+      if (e.touches.length >= 2 && Input.initialPinchDistance) {
+          const currentDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+          if (window.SettingsManager) {
+              SettingsManager.zoom = Math.max(0.7, Math.min(Input.initialZoom * (currentDistance / Input.initialPinchDistance), 1.3));
+              SettingsManager.save();
+              const el = document.getElementById('set-zoom');
+              if (el) el.value = SettingsManager.zoom;
+              if (typeof resize === 'function') resize();
+          }
+      }
       for(let i=0;i<e.changedTouches.length;i++){
         const t=e.changedTouches[i];
         if(t.identifier===stickTouchId){updateStick(t);}
-        else if(t.identifier===aimTouchId){Input.mouse.x=t.clientX;Input.mouse.y=t.clientY;}
+        else if(t.identifier===aimTouchId){
+          const p = toScreen(t.clientX, t.clientY);
+          Input.mouse.x=p.x;Input.mouse.y=p.y;
+        }
       }
     },{passive:true});
 

@@ -3,11 +3,17 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
   if (typeof Game !== 'undefined') {
-    Game.viewW = canvas.width;
-    Game.viewH = canvas.height;
+    const baseW = 1280;
+    const zoom = window.SettingsManager ? window.SettingsManager.zoom : 1.0;
+    Game.scale = (canvas.width / baseW) * zoom;
+    Game.viewW = canvas.width / Game.scale;
+    Game.viewH = canvas.height / Game.scale;
     Game.effViewW = canvas.width;
     Game.effViewH = canvas.height;
   }
@@ -51,13 +57,33 @@ function randomFloorTileFar(map,fx,fy,md){for(let a=0;a<60;a++){const tx=1+Math.
 
 class Camera{constructor(){this.x=0;this.y=0;}follow(t,vw,vh,dt){const tx=clamp(t.x-vw/2,0,Math.max(0,MAP_PX_W-vw));const ty=clamp(t.y-vh/2,0,Math.max(0,MAP_PX_H-vh));const e=Math.min(1,dt*8);this.x+=(tx-this.x)*e;this.y+=(ty-this.y)*e;}}
 
-function burst(Game,x,y,count,color,speed,gravity){for(let i=0;i<count;i++){const a=GameRNG.random()*Math.PI*2;const sp=(0.3+GameRNG.random()*0.7)*speed;Game.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.5+GameRNG.random()*0.4,color,size:2+GameRNG.random()*5,gravity:gravity||0});}}
-function muzzleFlash(Game,x,y,ang){Game.particles.push({x:x+Math.cos(ang)*20,y:y+Math.sin(ang)*20,vx:Math.cos(ang)*60,vy:Math.sin(ang)*60,life:0.15,color:'#fff',size:14,glow:true});Game.particles.push({x:x+Math.cos(ang)*16,y:y+Math.sin(ang)*16,vx:Math.cos(ang)*30,vy:Math.sin(ang)*30,life:0.1,color:'#e8a317',size:8,glow:true});}
+function burst(Game,x,y,count,color,speed,gravity){
+  if(window.SettingsManager && SettingsManager.gfx === 'low') count = Math.ceil(count/2);
+  for(let i=0;i<count;i++){const a=GameRNG.random()*Math.PI*2;const sp=(0.3+GameRNG.random()*0.7)*speed;Game.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0.5+GameRNG.random()*0.4,color,size:2+GameRNG.random()*5,gravity:gravity||0});}
+}
+function muzzleFlash(Game,x,y,ang){
+  const g = !(window.SettingsManager && SettingsManager.gfx === 'low');
+  Game.particles.push({x:x+Math.cos(ang)*20,y:y+Math.sin(ang)*20,vx:Math.cos(ang)*60,vy:Math.sin(ang)*60,life:0.15,color:'#fff',size:14,glow:g});Game.particles.push({x:x+Math.cos(ang)*16,y:y+Math.sin(ang)*16,vx:Math.cos(ang)*30,vy:Math.sin(ang)*30,life:0.1,color:'#e8a317',size:8,glow:g});
+}
 function screenFlash(Game,intensity){Game.flash=Math.max(Game.flash||0,intensity);}
 function screenShake(Game,amount){Game.shake=Math.max(Game.shake||0,amount);}
 function spawnBanner(Game,opts){Game.banners.push({title:opts.title,subtitle:opts.subtitle,color:opts.color||'#e8a317',t:0,duration:2.0});}
 function spawnFloatingText(Game,x,y,text,color){Game.floatTexts.push({x,y,text,color,life:1.0,vy:-60+GameRNG.random()*-40,vx:(GameRNG.random()-0.5)*30,t:0});}
 function spawnImpact(Game,x,y,color,size){Game.impacts.push({x,y,r:size||20,color:color||'#fff',life:0.12,t:0});burst(Game,x,y,8,color||'#fff',150,200);}
+
+const EPIC_SHOUTS = [
+    "ЖАЛКИЙ СМЕРТНЫЙ...",
+    "ПРЕВОСХОДНО...",
+    "БОЛЬШЕ КРОВИ...",
+    "И ЭТО ВСЕ?",
+    "ТВОЯ ДУША ПРИНАДЛЕЖИТ МНЕ...",
+    "НИКТО НЕ УЙДЕТ..."
+];
+
+function spawnEpicShout(Game) {
+    const text = EPIC_SHOUTS[Math.floor(GameRNG.random() * EPIC_SHOUTS.length)];
+    Game.shouts.push({text, t:0, duration:2.5});
+}
 
 loadMeta();
 
@@ -136,7 +162,15 @@ function updateBullets(Game,sdt){
     const b=bullets[i];b.x+=b.vx*sdt;b.y+=b.vy*sdt;
     if(b.trail){b.trail.push({x:b.x,y:b.y});if(b.trail.length>8)b.trail.shift();}
     if(isWallWorld(Game.map,b.x,b.y)){b.dead=true;if(b.splash){for(let j=0;j<targets.length;j++){const e=targets[j];if(e.dead)continue;if(Math.hypot(b.x-e.x,b.y-e.y)<b.splash){e.hp-=b.dmg;e.flash=1;if(e.hp<=0)killEnemy(Game,e);}}burst(Game,b.x,b.y,20,'#d97706',220,300);spawnImpact(Game,b.x,b.y,'#d97706',30);screenShake(Game,5);}else{burst(Game,b.x,b.y,5,'#888',80);spawnImpact(Game,b.x,b.y,'#1a1a1a',12);}continue;}
-    if(b.x<0||b.y<0||b.x>Game.map.pxW||b.y>Game.map.pxH){b.dead=true;continue;}
+    if(b.x<0||b.y<0||b.x>Game.map.pxW||b.y>Game.map.pxH){b.dead=true;}
+
+    if (b.dead && b.isInferno) {
+      if (!Game.zones) Game.zones = [];
+      Game.zones.push({x: b.x, y: b.y, r: 40, dmg: 5, life: 3.0, lastTick: 0});
+    }
+
+    if (b.dead) continue;
+
     if(b.friendly){
       forNearby(tgrid,b.x,b.y,e=>{
         if(e.dead||b.dead)return;const rr=b.r+e.r;if(Math.hypot(b.x-e.x,b.y-e.y)<rr){
@@ -151,8 +185,10 @@ function updateBullets(Game,sdt){
           const isCrit = GameRNG.random() < 0.15;
           const dmgDealt = isCrit ? b.dmg * 2 : b.dmg;
           e.hp-=dmgDealt;e.flash=1;playSoundHit(isCrit);
+          if (isCrit) burst(Game, e.x, e.y, 30, '#e8a317', 400);
           spawnFloatingText(Game,e.x,e.y-20,(Math.round(dmgDealt*10)/10).toString(),isCrit?'#e8a317':'#fff');
           spawnImpact(Game,b.x,b.y,b.color||'#1a1a1a',14);b.pierce--;
+          if (b.isIce) e.iceSlow = 1.0;
           if (b.ricochet && !b.dead && b.pierce > 0) {
               // find new target
               let newTarget = null;
@@ -171,6 +207,7 @@ function updateBullets(Game,sdt){
           } else {
               if(b.pierce<=0)b.dead=true;
           }
+          if (b.isRailgun && b.dead) burst(Game, e.x, e.y, 40, '#0ea5c7', 500); // Railgun visual impact
           if(e.hp<=0)killEnemy(Game,e);
         }
       });
@@ -185,7 +222,9 @@ function updateBullets(Game,sdt){
             const isCrit = GameRNG.random() < 0.15;
             const dmgDealt = isCrit ? b.dmg * 2 : b.dmg;
             e.hp-=dmgDealt;e.flash=1;playSoundHit(isCrit);
+            if (isCrit) burst(Game, e.x, e.y, 30, '#e8a317', 400);
             spawnFloatingText(Game,e.x,e.y-20,(Math.round(dmgDealt*10)/10).toString(),isCrit?'#e8a317':'#fff');
+            if (b.isIce) e.iceSlow = 1.0;
             if(e.hp<=0)killEnemy(Game,e);
           }
         }
@@ -211,7 +250,7 @@ function updateBullets(Game,sdt){
 
 const Game={
   state:'menu',viewW:window.innerWidth,viewH:window.innerHeight,effViewW:window.innerWidth,effViewH:window.innerHeight,
-  map:null,camera:new Camera(),player:null,enemies:[],bullets:[],particles:[],banners:[],floatTexts:[],impacts:[],loot:[], inventory:[], stats:{}, slowWalking: false,
+  map:null,camera:new Camera(),player:null,enemies:[],bullets:[],particles:[],banners:[],floatTexts:[],impacts:[],loot:[], inventory:[], stats:{}, slowWalking: false, shouts: [], zones: [],
   level:0,levelCfg:null,wave:1,kills:0,timeScale:0.05,shotSlowmo:0,spawnT:0,globalPower:1,scaleT:5,
   boss:null,flash:0,shake:0,leaderboard:loadLeaderboard(),pendingScore:null,
 
@@ -302,6 +341,8 @@ const Game={
     }
   },
     onBossDefeated(){
+    screenFlash(this, 2.0);
+    spawnEpicShout(this);
     this.portal = { x: this.player.x, y: this.player.y - 100 };
     this.portalTimer = 25; // 25 seconds soft timer
     this.portalNotified = false;
@@ -321,6 +362,29 @@ const Game={
     Input.cmd=false;
   },
   update(dt){
+    if (this.zones && this.zones.length > 0) {
+      let aliveZones = [];
+      const tgrid = buildGrid(this.boss ? this.enemies.concat([this.boss]) : this.enemies);
+      for (let i = 0; i < this.zones.length; i++) {
+        let z = this.zones[i];
+        z.life -= dt;
+        z.lastTick += dt;
+        if (z.lastTick > 0.5) {
+          z.lastTick = 0;
+          forNearby(tgrid, z.x, z.y, e => {
+            if (e.dead) return;
+            if (Math.hypot(e.x - z.x, e.y - z.y) < z.r + e.r) {
+              e.hp -= z.dmg; e.flash = 1;
+              spawnFloatingText(this, e.x, e.y - 20, z.dmg.toString(), '#ff4400');
+              if (e.hp <= 0) killEnemy(this, e);
+            }
+          });
+        }
+        if (z.life > 0) aliveZones.push(z);
+      }
+      this.zones = aliveZones;
+    }
+
     if(this.state==='menu'){
       if(Input.clickUpgrades){
         document.getElementById('upgrades-menu').style.display='flex';
@@ -492,17 +556,32 @@ const Game={
     this.shake=Math.max(0,this.shake-dt*15);
   },
   draw(){
-    ctx.clearRect(0,0,this.viewW,this.viewH);
+    ctx.clearRect(0,0,this.effViewW,this.effViewH);
     if(this.state==='menu'){drawMenu();return;}
+    ctx.save();
+    if(this.scale) ctx.scale(this.scale, this.scale);
     ctx.save();
     const sx=(GameRNG.random()-0.5)*this.shake*2,sy=(GameRNG.random()-0.5)*this.shake*2;
     ctx.translate(sx-Math.round(this.camera.x),sy-Math.round(this.camera.y));
-    drawMap(this.camera,this.viewW,this.viewH);
+    // Base view dimension for map draw
+    const bW = this.viewW, bH = this.viewH;
+    drawMap(this.camera,bW,bH);
+
+    if (this.zones) {
+      for (let i = 0; i < this.zones.length; i++) {
+        let z = this.zones[i];
+        ctx.fillStyle = 'rgba(255, 68, 0, 0.3)';
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
     drawWorldEntities();
     ctx.restore();
+    // draw HUD within logic scale, so text scales correctly to the logical dimensions
     drawHud();drawMinimap();
     if (typeof drawContractsHUD === 'function') drawContractsHUD(ctx, this);
     if (typeof drawRadioHUD === 'function') drawRadioHUD(ctx, this);
+    ctx.restore(); // restores the original identity scale matrix
     this.flash=Math.max(0,(this.flash||0)-0.033*3);
     if(this.flash>0.01){
       ctx.fillStyle='rgba(255,255,255,'+(this.flash*0.6)+')';
@@ -511,10 +590,49 @@ const Game={
     }
     updateAndDrawBanners(ctx,this,1/60,this.viewW,this.viewH);
     updateAndDrawFloatTexts(ctx,this,1/60);
+
+    // Draw Shouts
+    if (this.shouts && this.shouts.length > 0) {
+        let aliveShouts = [];
+        ctx.save();
+        for (let i = 0; i < this.shouts.length; i++) {
+            let shout = this.shouts[i];
+            shout.t += 1/60;
+            if (shout.t <= shout.duration) {
+                aliveShouts.push(shout);
+                let alpha = 1.0;
+                if (shout.t < 0.3) alpha = shout.t / 0.3;
+                else if (shout.duration - shout.t < 0.5) alpha = (shout.duration - shout.t) / 0.5;
+
+                let scale = 1.0 + (shout.t / shout.duration) * 0.2;
+
+                ctx.save();
+                ctx.translate(this.viewW / 2, this.viewH / 4);
+                ctx.scale(scale, scale);
+                ctx.globalAlpha = alpha;
+
+                ctx.font = "bold 40px monospace";
+                ctx.fillStyle = "#d92638";
+                ctx.strokeStyle = "#1a1a1a";
+                ctx.lineWidth = 4;
+                ctx.textAlign = "center";
+                ctx.strokeText(shout.text, 0, 0);
+                ctx.fillText(shout.text, 0, 0);
+
+                ctx.restore();
+            }
+        }
+        ctx.restore();
+        this.shouts = aliveShouts;
+    }
     updateAndDrawImpacts(ctx,this,1/60);
     if(this.state==='death')drawDeathScreen();
   },
   loop(t){
+    const targetDt = window.SettingsManager && window.SettingsManager.fps ? 1000/window.SettingsManager.fps : 0;
+    if (targetDt > 0 && t - (this.lastRender||0) < targetDt) { requestAnimationFrame(n=>this.loop(n)); return; }
+    this.lastRender = t;
+
     const now=t/1000;
     const dt=Math.min(now-(this.last||now),0.1);
     this.last=now;

@@ -74,6 +74,30 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('inventory-menu').style.display = 'none';
     Game.state = 'play';
   };
+  document.getElementById('btn-settings-close').onclick = () => {
+    document.getElementById('settings-menu').style.display = 'none';
+  };
+
+  if (window.SettingsManager) {
+      document.getElementById('set-zoom').value = SettingsManager.zoom;
+      document.getElementById('set-fps').value = SettingsManager.fps;
+      document.getElementById('set-gfx').value = SettingsManager.gfx;
+
+      document.getElementById('set-zoom').addEventListener('input', (e) => {
+          SettingsManager.zoom = parseFloat(e.target.value);
+          SettingsManager.save();
+          if(typeof resize === 'function') resize();
+      });
+      document.getElementById('set-fps').addEventListener('change', (e) => {
+          SettingsManager.fps = parseInt(e.target.value);
+          SettingsManager.save();
+      });
+      document.getElementById('set-gfx').addEventListener('change', (e) => {
+          SettingsManager.gfx = e.target.value;
+          SettingsManager.save();
+      });
+  }
+
   document.getElementById('btn-loot-skip').onclick = () => {
     document.getElementById('loot-compare').style.display = 'none';
     Game.pendingLoot = null;
@@ -222,6 +246,8 @@ function drawMinimap(){
 }
 
 function drawMenu(){
+  ctx.save();
+  if (Game.scale) ctx.scale(Game.scale, Game.scale);
   const g=ctx.createLinearGradient(0,0,0,Game.viewH);
   g.addColorStop(0,'#faf6f0');g.addColorStop(1,'#f5f0e8');
   ctx.fillStyle=g;ctx.fillRect(0,0,Game.viewW,Game.viewH);
@@ -279,9 +305,25 @@ function drawMenu(){
   ctx.font = 'bold 16px monospace';
   ctx.textAlign = 'center';
   ctx.fillText('ПРОКАЧКА', Game.viewW/2, uy + 25);
+
+  // Draw Settings Button
+  const suw = 200, suh = 40;
+  const sux = Game.viewW/2 - suw/2, suy = Game.viewH*0.75 + 50 - suh/2;
+  const shover = (Input.mouse.x >= sux && Input.mouse.x <= sux+suw && Input.mouse.y >= suy && Input.mouse.y <= suy+suh);
+  ctx.fillStyle = shover ? '#e8a317' : 'rgba(232,163,23,0.2)';
+  ctx.strokeStyle = '#e8a317';
+  ctx.lineWidth = 2;
+  ctx.fillRect(sux, suy, suw, suh);
+  ctx.strokeRect(sux, suy, suw, suh);
+  ctx.fillStyle = shover ? '#1a1a1a' : '#e8a317';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('НАСТРОЙКИ', Game.viewW/2, suy + 25);
+
   ctx.textAlign = 'left';
   ctx.fillStyle = '#1a1a1a';
   ctx.fillText(`ОСКОЛКИ: ${metaState.shards}`, 10, 20);
+  ctx.restore();
 }
 
 function drawDeathScreen(){

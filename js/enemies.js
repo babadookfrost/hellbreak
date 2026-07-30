@@ -145,6 +145,12 @@ function killEnemy(Game,e){
     Game.loot.push({x: e.x, y: e.y, type: 'weapon', color: color, r: 10});
   }
 
+  let aliveEnemies = 0;
+  for(let i=0; i<Game.enemies.length; i++) {
+      if(!Game.enemies[i].dead && Game.enemies[i] !== e) aliveEnemies++;
+  }
+  if (aliveEnemies === 0 && !Game.boss) Game.shotSlowmo = 0.5;
+
   if(e.isBoss){
     Game.kills+=20;
     burst(Game,e.x,e.y,80,'#d92638',450,150);
@@ -202,10 +208,13 @@ function updateEnemies(Game,sdt){
     }
     const c=Math.cos(ang),s=Math.sin(ang);
 
+    let speedMod = e.iceSlow > 0 ? 0.5 : 1;
+    if (e.iceSlow) e.iceSlow = Math.max(0, e.iceSlow - sdt);
+
     const oldX = e.x, oldY = e.y;
     let attemptedMove = false;
-    e.vx = c * e.speed;
-    e.vy = s * e.speed; // Save for visual rotation later
+    e.vx = c * e.speed * speedMod;
+    e.vy = s * e.speed * speedMod; // Save for visual rotation later
 
     if(e.isBoss){
         if (e.bossType === 'boss2') {
