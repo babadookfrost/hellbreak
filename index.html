@@ -29,6 +29,21 @@
 </form>
 </div>
 
+<div class="name-entry" id="operator-select-menu" style="display:none; flex-direction:column; z-index:20;">
+  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:500px; display:flex; flex-direction:column; gap:16px;">
+    <div class="name-entry-title">ВЫБОР ОПЕРАТОРА</div>
+
+    <div style="display:flex; flex-direction:column; gap:12px;" id="operators-list">
+      <!-- Operators will be populated here -->
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:8px;">
+      <button id="btn-op-close" style="flex:1; background:#ccc; color:#333; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px;">НАЗАД</button>
+      <button id="btn-op-start" style="flex:2; background:var(--ind); color:#1a1a1a; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px;">В БОЙ</button>
+    </div>
+  </div>
+</div>
+
 <div class="name-entry" id="upgrades-menu" style="display:none; flex-direction:column;">
   <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:500px; display:flex; flex-direction:column; gap:16px;">
     <div class="name-entry-title">ПРОКАЧКА</div>
@@ -79,6 +94,7 @@
 </div>
 
 <script src="js/settings.js"></script>
+<script src="js/operators.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/daily.js"></script>
 <script src="js/input.js"></script>

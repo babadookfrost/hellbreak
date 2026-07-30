@@ -67,6 +67,18 @@ function showInventoryMenu() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btn-op-close').onclick = () => {
+    document.getElementById('operator-select-menu').style.display = 'none';
+    Game.state = 'menu';
+  };
+  document.getElementById('btn-op-start').onclick = () => {
+    document.getElementById('operator-select-menu').style.display = 'none';
+    if (typeof showContractsMenu === 'function') {
+      showContractsMenu();
+    } else {
+      Game.start();
+    }
+  };
   document.getElementById('btn-upgrades-close').onclick = () => {
     document.getElementById('upgrades-menu').style.display = 'none';
   };
@@ -399,5 +411,41 @@ function wireNameEntry(){
     Game.pendingScore=null;
     document.getElementById('name-entry').style.display='none';
     Game.state='death';
+  });
+}
+
+function renderOperatorsUI() {
+  const list = document.getElementById('operators-list');
+  list.innerHTML = '';
+
+  Object.keys(OPERATORS).forEach(opId => {
+    const op = OPERATORS[opId];
+    const isUnlocked = op.unlockedByDefault || metaState.unlockedOperators.includes(opId);
+    const isSelected = metaState.lastOperator === opId;
+
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex; justify-content:space-between; align-items:center; padding:12px; border:2px solid ${isSelected ? 'var(--ind)' : '#ccc'}; border-radius:8px; background:${isSelected ? '#e8f4f8' : (isUnlocked ? '#faf8f4' : '#eee')}; cursor:${isUnlocked ? 'pointer' : 'not-allowed'}; opacity:${isUnlocked ? '1' : '0.6'};`;
+
+    row.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-weight:bold; color:var(--bone); font-size:16px;">${op.name} ${isSelected ? '<span style="color:var(--ind); font-size:12px;">[ВЫБРАН]</span>' : ''}</div>
+        <div style="font-size:12px; color:#5a5a5a; margin-top:4px;">${op.desc}</div>
+        <div style="font-size:11px; color:var(--blood); margin-top:4px; font-weight:bold;">${op.statsText}</div>
+        ${!isUnlocked ? `<div style="font-size:11px; color:#d92638; margin-top:4px; font-weight:bold;">ЗАБЛОКИРОВАНО (ЦЕНА: ${op.cost} ОСК. В МЕНЮ ПРОКАЧКИ)</div>` : ''}
+      </div>
+      <div style="width:40px; height:40px; border-radius:50%; background:${op.color1}; display:flex; justify-content:center; align-items:center; border:2px solid ${op.color2};">
+         <div style="width:16px; height:6px; background:${op.color2};"></div>
+      </div>
+    `;
+
+    if (isUnlocked) {
+      row.onclick = () => {
+        metaState.lastOperator = opId;
+        saveMeta();
+        renderOperatorsUI(); // re-render to show selection
+      };
+    }
+
+    list.appendChild(row);
   });
 }

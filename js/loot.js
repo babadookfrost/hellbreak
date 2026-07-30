@@ -74,18 +74,32 @@ function generateLootItem(forcedRarity, floorIndex = 0) {
 }
 
 const META_KEY='myasorubka_meta_v1';
-let metaState = { shards: 0, hpLvl: 0, dmgLvl: 0, startItem: 0, extraSlot: 0 };
-function loadMeta(){try{const r=JSON.parse(localStorage.getItem(META_KEY));if(r)metaState=r;}catch{}}
+let metaState = { shards: 0, hpLvl: 0, dmgLvl: 0, startItem: 0, extraSlot: 0, unlockedOperators: ['recruit'], lastOperator: 'recruit' };
+function loadMeta(){try{const r=JSON.parse(localStorage.getItem(META_KEY));if(r){metaState={...metaState, ...r}; if(!metaState.unlockedOperators) metaState.unlockedOperators=['recruit']; if(!metaState.lastOperator) metaState.lastOperator='recruit';}}catch{}}
 function saveMeta(){try{localStorage.setItem(META_KEY,JSON.stringify(metaState));}catch{}}
 const META_UPGRADES = [
   { id: 'hp', name: '+10% Макс HP', maxLvl: 5, baseCost: 50, costMult: 1.5, desc: 'Увеличивает стартовое здоровье.' },
   { id: 'dmg', name: '+5% Урон', maxLvl: 5, baseCost: 100, costMult: 1.5, desc: 'Увеличивает базовый урон.' },
   { id: 'item', name: 'Стартовый предмет', maxLvl: 1, baseCost: 300, costMult: 1, desc: 'Даёт случайный предмет на старте.' },
   { id: 'slot', name: '+1 Слот инвентаря', maxLvl: 1, baseCost: 500, costMult: 1, desc: 'Увеличивает инвентарь до 5 слотов.' }
+  // Операторы не покупаются через этот список, у них свое меню, либо мы можем добавить их сюда
 ];
 
+// Динамически добавляем операторов, которые еще не разблокированы, в список покупок
+function getAvailableUpgrades() {
+  let upgs = [...META_UPGRADES];
+  if (!metaState.unlockedOperators.includes('juggernaut')) {
+    upgs.push({ id: 'juggernaut', name: 'ОПЕРАТОР: Джаггернаут', maxLvl: 1, baseCost: OPERATORS.juggernaut.cost, costMult: 1, desc: OPERATORS.juggernaut.statsText });
+  }
+  if (!metaState.unlockedOperators.includes('phantom')) {
+    upgs.push({ id: 'phantom', name: 'ОПЕРАТОР: Призрак', maxLvl: 1, baseCost: OPERATORS.phantom.cost, costMult: 1, desc: OPERATORS.phantom.statsText });
+  }
+  return upgs;
+}
+
 function getUpgradeCost(id, lvl) {
-  const upg = META_UPGRADES.find(u => u.id === id);
+  const allUpgs = getAvailableUpgrades();
+  const upg = allUpgs.find(u => u.id === id);
   if (lvl >= upg.maxLvl) return Infinity;
   return Math.floor(upg.baseCost * Math.pow(upg.costMult, lvl));
 }
@@ -95,12 +109,14 @@ function renderUpgradesUI() {
   const list = document.getElementById('upgrades-list');
   list.innerHTML = '';
 
-  META_UPGRADES.forEach(u => {
+  const allUpgs = getAvailableUpgrades();
+  allUpgs.forEach(u => {
     let lvl = 0;
     if (u.id === 'hp') lvl = metaState.hpLvl;
     if (u.id === 'dmg') lvl = metaState.dmgLvl;
     if (u.id === 'item') lvl = metaState.startItem;
     if (u.id === 'slot') lvl = metaState.extraSlot;
+    if (['juggernaut', 'phantom'].includes(u.id)) lvl = metaState.unlockedOperators.includes(u.id) ? 1 : 0;
 
     const cost = getUpgradeCost(u.id, lvl);
     const maxed = lvl >= u.maxLvl;
@@ -127,6 +143,9 @@ function renderUpgradesUI() {
         if (u.id === 'dmg') metaState.dmgLvl++;
         if (u.id === 'item') metaState.startItem++;
         if (u.id === 'slot') metaState.extraSlot++;
+        if (['juggernaut', 'phantom'].includes(u.id)) {
+          metaState.unlockedOperators.push(u.id);
+        }
         saveMeta();
         renderUpgradesUI();
       };
