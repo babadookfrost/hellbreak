@@ -315,7 +315,8 @@ function updateEnemies(Game,sdt){
     }
 
     const rr=e.r+p.r;
-    if(p.invuln<=0&&Math.hypot(e.x-p.x,e.y-p.y)<rr){
+    const dx=e.x-p.x,dy=e.y-p.y;
+    if(p.invuln<=0&&dx*dx+dy*dy<rr*rr){
       if(e.type === 'kamikaze') {
         killEnemy(Game, e);
       } else {
