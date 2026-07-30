@@ -524,7 +524,11 @@ wss.on('connection', (ws) => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`🔥 Hellbreak сервер запущен на порту ${PORT}`);
-    console.log(`   Подключайся: ws://localhost:${PORT}`);
-});
+if (require.main === module) {
+    server.listen(PORT, () => {
+        console.log(`🔥 Hellbreak сервер запущен на порту ${PORT}`);
+        console.log(`   Подключайся: ws://localhost:${PORT}`);
+    });
+}
+
+module.exports = { Room, UPGRADES, COLORS, distSq };
