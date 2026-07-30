@@ -243,15 +243,35 @@ class Room {
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
 
+            if (e.targetTimer === undefined) {
+                e.targetTimer = 0;
+                e.targetId = null;
+            }
+
+            e.targetTimer -= dt;
+
             let nearest = null;
             let minDist = Infinity;
-            for (const p of this.players.values()) {
-                if (!p.alive) continue;
-                const d = distSq(e.x, e.y, p.x, p.y);
-                if (d < minDist) {
-                    minDist = d;
-                    nearest = p;
+
+            if (e.targetTimer <= 0 || e.targetId === null || !this.players.has(e.targetId) || !this.players.get(e.targetId).alive) {
+                for (const p of this.players.values()) {
+                    if (!p.alive) continue;
+                    const d = distSq(e.x, e.y, p.x, p.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = p;
+                    }
                 }
+
+                if (nearest) {
+                    e.targetId = nearest.id;
+                } else {
+                    e.targetId = null;
+                }
+                e.targetTimer = 0.5 + Math.random() * 0.5; // кэшируем цель на 0.5 - 1.0 сек
+            } else {
+                nearest = this.players.get(e.targetId);
+                minDist = distSq(e.x, e.y, nearest.x, nearest.y);
             }
 
             if (!nearest) {
