@@ -99,11 +99,20 @@ function initAudio() {
 }
 
 function createPlayer(spawn){
+  const opId = Game.isDaily ? 'recruit' : (metaState.lastOperator || 'recruit');
+  const op = typeof OPERATORS !== 'undefined' && OPERATORS[opId] ? OPERATORS[opId] : { hpMul: 1, dmgMul: 1, weapon: null, color1: '#1a1a1a', color2: '#fff' };
+
+  const baseHp = 50;
+  const hp = Math.floor(baseHp * op.hpMul);
+
   return{
     x:spawn.x,y:spawn.y,r:14,speed:280,
-    weaponId:'pistol',ammo:WEAPONS.pistol.ammoMax,reloading:0,cd:0,
+    weaponId: op.weapon || 'pistol',
+    ammo: WEAPONS[op.weapon || 'pistol'] ? WEAPONS[op.weapon || 'pistol'].ammoMax : 10,
+    reloading:0,cd:0,
     dashCd:0,dashT:0,dashDX:0,dashDY:0,dashUnlocked:false,invuln:0,
-    hp:50,maxHp:50 // 30 HP по умолчанию
+    hp:hp,maxHp:hp,
+    op: op
   };
 }
 
@@ -117,7 +126,10 @@ function applyLevelStart(Game, isContinuation = false){
 
 
   if (!isContinuation) {
-    Game.player.weaponId=cfg.weaponOrder[0];const w=WEAPONS[Game.player.weaponId];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
+    if (!Game.player.op || !Game.player.op.weapon) {
+      Game.player.weaponId=cfg.weaponOrder[0];
+    }
+    const w=WEAPONS[Game.player.weaponId];Game.player.ammo=Math.max(1, w.ammoMax + Game.stats.ammoAdd);Game.player.reloading=0;
   }
 
   if (typeof checkContractsOnFloorStart === 'function') checkContractsOnFloorStart(Game.level);
@@ -288,6 +300,11 @@ const Game={
 
   recalcStats() {
     const s = { dmgMul: 1 + (metaState.dmgLvl * 0.05), pierceAdd: 0, dashCdMul: 1, speedMul: 1, slowTime: 0, reloadMul: 1, pickupMul: 1, ammoSave: 0, hpMul: 1 + (metaState.hpLvl * 0.1), ammoAdd: 0, dmgTakenMul: 1 };
+    if (this.player && this.player.op) {
+      s.dmgMul *= this.player.op.dmgMul;
+      // HP multiplier is already applied in maxHp calculation inside createPlayer,
+      // but we can scale maxHp dynamically if we want. For now, maxHp is set in createPlayer.
+    }
     for (const item of this.inventory) {
       if(!item) continue;
       for (const affix of [item.pos, item.neg]) {
@@ -416,6 +433,11 @@ const Game={
       this.zones = aliveZones;
     }
 
+    if(this.state==='operator-select') {
+      Input.cmd = false;
+      return;
+    }
+
     if(this.state==='menu'){
       if(Input.clickUpgrades){
         document.getElementById('upgrades-menu').style.display='flex';
@@ -430,7 +452,11 @@ const Game={
         } else if (document.getElementById('contracts-menu').style.display !== 'none') {
           // ignore, wait for UI interaction
         } else {
-          showContractsMenu();
+          if (!metaState.unlockedOperators) metaState.unlockedOperators = ['recruit'];
+          if (!metaState.lastOperator) metaState.lastOperator = 'recruit';
+          this.state = 'operator-select';
+          document.getElementById('operator-select-menu').style.display = 'flex';
+          renderOperatorsUI();
         }
       }
       Input.cmd=false;
@@ -450,11 +476,7 @@ const Game={
     if(this.state==='death'){
       if(Input.cmd) {
         if (typeof resetContractsState === 'function') resetContractsState();
-        if (typeof showContractsMenu === 'function') {
-          showContractsMenu();
-        } else {
-          this.start();
-        }
+        this.state = 'menu';
       }
       Input.cmd=false;
       for(let i=0;i<this.particles.length;i++){const pt=this.particles[i];pt.x+=pt.vx*dt;pt.y+=pt.vy*dt;pt.life-=dt;if(pt.gravity)pt.vy+=pt.gravity*dt;}
@@ -911,10 +933,13 @@ function drawWorldEntities(){
   const pg=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,100);
   pg.addColorStop(0,'rgba(232,163,23,0.18)');pg.addColorStop(1,'rgba(232,163,23,0)');
   ctx.fillStyle=pg;ctx.beginPath();ctx.arc(p.x,p.y,100,0,Math.PI*2);ctx.fill();
+  const baseColor = (p.op && p.op.color1) ? p.op.color1 : '#1a1a1a';
+  const visorColor = (p.op && p.op.color2) ? p.op.color2 : '#fff';
+
   if(p.dashT>0){ctx.shadowColor='#0ea5c7';ctx.shadowBlur=20;}
   else if(p.invuln>0){ctx.shadowColor='#0ea5c7';ctx.shadowBlur=12;}
-  else{ctx.shadowColor='#e8a317';ctx.shadowBlur=8;}
-  ctx.fillStyle=p.dashT>0?'#0ea5c7':p.invuln>0?'#0ea5c7':'#1a1a1a';
+  else{ctx.shadowColor=visorColor;ctx.shadowBlur=8;}
+  ctx.fillStyle=p.dashT>0?'#0ea5c7':p.invuln>0?'#0ea5c7':baseColor;
 
   const mw={x:Input.mouse.x+Game.camera.x,y:Input.mouse.y+Game.camera.y};
   const pRot = Math.atan2(mw.y - p.y, mw.x - p.x);
@@ -923,14 +948,23 @@ function drawWorldEntities(){
   ctx.translate(p.x, p.y);
   ctx.rotate(pRot);
 
-  // Body (Diamond / Polygon)
+  // Body
   ctx.beginPath();
-  ctx.moveTo(p.r, 0); ctx.lineTo(0, p.r*0.8); ctx.lineTo(-p.r*0.8, 0); ctx.lineTo(0, -p.r*0.8);
+  if (p.op && p.op.id === 'juggernaut') {
+    // Bulky square-ish
+    ctx.rect(-p.r*0.9, -p.r*0.9, p.r*1.8, p.r*1.8);
+  } else if (p.op && p.op.id === 'phantom') {
+    // Sharp triangle
+    ctx.moveTo(p.r*1.2, 0); ctx.lineTo(-p.r*0.8, p.r*0.8); ctx.lineTo(-p.r*0.8, -p.r*0.8);
+  } else {
+    // Default Diamond
+    ctx.moveTo(p.r, 0); ctx.lineTo(0, p.r*0.8); ctx.lineTo(-p.r*0.8, 0); ctx.lineTo(0, -p.r*0.8);
+  }
   ctx.closePath();
   ctx.fill();
 
   // Eye / Visor
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = visorColor;
   ctx.fillRect(p.r*0.2, -4, p.r*0.5, 8);
 
   // Hand/Gun stub
