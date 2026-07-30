@@ -239,13 +239,20 @@ class Room {
             if (destroyed) this.projectiles.splice(i, 1);
         }
 
+        // Кешируем живых игроков для оптимизации O(N*M) циклов
+        const alivePlayers = [];
+        for (const p of this.players.values()) {
+            if (p.alive) alivePlayers.push(p);
+        }
+
         // ------ Враги ------
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
 
             let nearest = null;
             let minDist = Infinity;
-            for (const p of this.players.values()) {
+            for (let j = 0; j < alivePlayers.length; j++) {
+                const p = alivePlayers[j];
                 if (!p.alive) continue;
                 const d = distSq(e.x, e.y, p.x, p.y);
                 if (d < minDist) {
@@ -289,7 +296,8 @@ class Room {
 
         // ------ Магнит для кристаллов ------
         for (const g of this.gems) {
-            for (const p of this.players.values()) {
+            for (let j = 0; j < alivePlayers.length; j++) {
+                const p = alivePlayers[j];
                 if (!p.alive) continue;
                 const d = distSq(g.x, g.y, p.x, p.y);
                 if (d < p.pickupRadius ** 2) {
@@ -304,7 +312,8 @@ class Room {
         for (let i = this.gems.length - 1; i >= 0; i--) {
             const g = this.gems[i];
             let picked = false;
-            for (const p of this.players.values()) {
+            for (let j = 0; j < alivePlayers.length; j++) {
+                const p = alivePlayers[j];
                 if (!p.alive) continue;
                 if (distSq(g.x, g.y, p.x, p.y) < (p.radius + g.radius) ** 2) {
                     p.xp += g.xp;
