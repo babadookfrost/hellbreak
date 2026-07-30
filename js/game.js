@@ -995,3 +995,5 @@ function drawWorldEntities(){
 }
 
 window.onload=()=>Game.init();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = { compact, compactByLife };
