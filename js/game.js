@@ -24,10 +24,41 @@ const TILE=80,MAP_W=48,MAP_H=48,BLOCK=6,MAP_PX_W=MAP_W*TILE,MAP_PX_H=MAP_H*TILE;
 function compact(arr,dk){let w=0;for(let i=0;i<arr.length;i++)if(!arr[i][dk])arr[w++]=arr[i];arr.length=w;}
 function compactByLife(arr){let w=0;for(let i=0;i<arr.length;i++)if(arr[i].life>0)arr[w++]=arr[i];arr.length=w;}
 const CELL=96;
-function buildGrid(ents){const g=new Map();for(let i=0;i<ents.length;i++){const e=ents[i];const k=(Math.floor(e.x/CELL))+','+(Math.floor(e.y/CELL));let b=g.get(k);if(!b){b=[];g.set(k,b);}b.push(e);}return g;}
-function forNearby(g,x,y,cb){const cx=Math.floor(x/CELL),cy=Math.floor(y/CELL);for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const b=g.get((cx+ox)+','+(cy+oy));if(b)for(let i=0;i<b.length;i++)cb(b[i]);}}
-const clamp=(v,a,b)=>Math.max(a,Math.min(v,b));
-function easeOutBack(x){const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2);}
+function buildGrid(ents) {
+  const g = new Map();
+  for (let i = 0; i < ents.length; i++) {
+    const e = ents[i];
+    const k = Math.floor(e.x / CELL) + ',' + Math.floor(e.y / CELL);
+    let b = g.get(k);
+    if (!b) {
+      b = [];
+      g.set(k, b);
+    }
+    b.push(e);
+  }
+  return g;
+}
+function forNearby(g, x, y, cb) {
+  const cx = Math.floor(x / CELL);
+  const cy = Math.floor(y / CELL);
+  for (let ox = -1; ox <= 1; ox++) {
+    for (let oy = -1; oy <= 1; oy++) {
+      const b = g.get((cx + ox) + ',' + (cy + oy));
+      if (b) {
+        for (let i = 0; i < b.length; i++) {
+          cb(b[i]);
+        }
+      }
+    }
+  }
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(v, b));
+
+function easeOutBack(x) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+}
 
 function generateMap(){
   const grid=new Uint8Array(MAP_W*MAP_H);
