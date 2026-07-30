@@ -1,5 +1,27 @@
 {
   "dependencies": {
     "ws": "^8.21.1"
+  },
+  "name": "app",
+  "version": "1.0.0",
+  "description": "**Кооперативный survival в стиле Vampire Survivors, только сложнее.**",
+  "main": "patch_server.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/babadookfrost/hellbreak.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/babadookfrost/hellbreak/issues"
+  },
+  "homepage": "https://github.com/babadookfrost/hellbreak#readme",
+  "devDependencies": {
+    "jest": "^30.4.2"
   }
 }

@@ -43,4 +43,16 @@ const RNG = {
     }
 };
 
-window.GameRNG = RNG; // Expose to global scope
+if (typeof window !== 'undefined') {
+    window.GameRNG = RNG; // Expose to global scope
+}
+
+function easeOutBack(x){const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2);}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        splitmix32,
+        RNG,
+        easeOutBack
+    };
+}
