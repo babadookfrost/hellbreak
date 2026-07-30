@@ -102,7 +102,7 @@ function initAudio() {
 function createPlayer(spawn){
   return{
     x:spawn.x,y:spawn.y,r:14,speed:280,
-    weaponId:'pistol',ammo:WEAPONS.pistol.ammoMax,reloading:0,cd:0,
+    weaponId:'fire_staff',ammo:WEAPONS.fire_staff.ammoMax,reloading:0,cd:0,
     dashCd:0,dashT:0,dashDX:0,dashDY:0,dashUnlocked:false,invuln:0,
     hp:50,maxHp:50 // 30 HP по умолчанию
   };

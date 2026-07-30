@@ -60,7 +60,7 @@ function playSoundShoot(weaponId) {
   gain.connect(audioCtx.destination);
 
   let dur = 0.1, vol = 0.1;
-  if (weaponId === 'shotgun') { osc.type = 'square'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2); dur = 0.2; vol = 0.15; }
+  if (weaponId === 'ice_wand') { osc.type = 'square'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2); dur = 0.2; vol = 0.15; }
   else if (weaponId === 'rocket') { osc.type = 'square'; osc.frequency.setValueAtTime(100, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.3); dur = 0.3; vol = 0.2; }
   else if (weaponId === 'bow') { osc.type = 'sine'; osc.frequency.setValueAtTime(400, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(300, audioCtx.currentTime + 0.1); }
   else { osc.type = 'square'; osc.frequency.setValueAtTime(300, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1); }
@@ -107,7 +107,7 @@ function fireWeapon(Game,ax,ay){
       isIce: p.weaponId === 'winter_wand'
     });
   }
-  muzzleFlash(Game,p.x,p.y,ang);screenShake(Game,w.splash?8:(w.id==='shotgun'||w.id==='sweeper'?5:2));
+  muzzleFlash(Game,p.x,p.y,ang);screenShake(Game,w.splash?8:(w.id==='ice_wand'||w.id==='winter_wand'?5:2));
   playSoundShoot(w.id);
 }
 
