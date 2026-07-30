@@ -1,11 +1,7 @@
-<<<<<<< SEARCH
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Hellbreak Server Running\n');
-});
-=======
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
+
 const server = http.createServer((req, res) => {
   let filePath = '.' + req.url;
   if (filePath == './') filePath = './index.html';
@@ -32,12 +28,12 @@ const server = http.createServer((req, res) => {
 
   fs.readFile(filePath, function(error, content) {
     if (error) {
-      if(error.code == 'ENOENT'){
+      if (error.code == 'ENOENT') {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('404 Not Found\n');
       } else {
         res.writeHead(500);
-        res.end('Sorry, check with the site admin for error: '+error.code+' ..\n');
+        res.end('Sorry, check with the site admin for error: ' + error.code + ' ..\n');
       }
     } else {
       res.writeHead(200, { 'Content-Type': contentType });
@@ -45,4 +41,8 @@ const server = http.createServer((req, res) => {
     }
   });
 });
->>>>>>> REPLACE
+
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
