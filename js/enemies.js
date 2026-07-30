@@ -56,19 +56,44 @@ function playSoundDeath(type) {
 }
 
 function spawnEnemy(Game){
-  const cfg=getLevelConfig(Game.level, Game.wave),type=cfg.enemyTypes[Math.floor(Math.random()*cfg.enemyTypes.length)];
+  const cfg=getLevelConfig(Game.level, Game.wave),type=cfg.enemyTypes[Math.floor(GameRNG.random()*cfg.enemyTypes.length)];
   const base=ENEMY_BASE[type];const vs=Math.max(Game.effViewW||Game.viewW,Game.effViewH||Game.viewH);
   const spot=randomFloorTileFar(Game.map,Game.player.x,Game.player.y,vs*0.7);const power=Math.min(4.5,Game.globalPower);
   const hp=Math.max(1,Math.round(base.hp*cfg.hpMul*Math.min(2.5,power)));
-  Game.enemies.push({x:spot.x,y:spot.y,r:base.r,type,hp,maxHp:hp,speed:base.speed*cfg.speedMul*Math.min(2.1,power),fireCd:base.fireCd||0,jitter:(Math.random()-0.5)*0.5,dead:false,flash:0,targetOffsetX:0,targetOffsetY:0,offsetUpdateTimer:0,dodgeTimer:0,dodgeAng:0});
+  Game.enemies.push({x:spot.x,y:spot.y,r:base.r,type,hp,maxHp:hp,speed:base.speed*cfg.speedMul*Math.min(2.1,power),fireCd:base.fireCd||0,jitter:(GameRNG.random()-0.5)*0.5,dead:false,flash:0,targetOffsetX:0,targetOffsetY:0,offsetUpdateTimer:0,dodgeTimer:0,dodgeAng:0});
 }
 
 function spawnBoss(Game){
   const isHeart = (Game.level % FLOORS.length) === 3;
+  const isFridgeLevel = (Game.level % FLOORS.length) === 1;
 
   const cfg=getLevelConfig(Game.level, Game.wave);const spot=randomFloorTileFar(Game.map,Game.player.x,Game.player.y,500);
-  Game.boss={x:spot.x,y:spot.y,r:isHeart ? 56 : 46,hp:cfg.bossHp * (isHeart ? 1.5 : 1),maxHp:cfg.bossHp * (isHeart ? 1.5 : 1),speed:(isHeart ? 50 : 75)*cfg.speedMul,burstCd:isHeart ? 1.2 : 1.6,dead:false,flash:0,isBoss:true,isHeart:isHeart,targetOffsetX:0,targetOffsetY:0,offsetUpdateTimer:0,dodgeTimer:0,dodgeAng:0};
-  spawnBanner(Game,{title:isHeart ? 'СЕРДЦЕ МЯСОРУБКИ' : 'БОСС ПРИБЫЛ',subtitle:isHeart ? 'ОНО ПУЛЬСИРУЕТ' : 'ВЫЖИВИ',color:'#d92638'});screenFlash(Game,0.8);screenShake(Game,10);
+
+  // Decide which boss to spawn
+  let bossType = 'boss1';
+  if (isHeart) { bossType = 'heart'; }
+  else if (isFridgeLevel) { bossType = 'boss2'; } // Guarantee Boss 2 on Fridge level
+  else if (GameRNG.random() > 0.5) { bossType = 'boss2'; } // 50/50 otherwise
+
+  Game.boss = {
+      x:spot.x, y:spot.y,
+      r: (bossType === 'heart') ? 56 : ((bossType === 'boss2') ? 60 : 46),
+      hp: cfg.bossHp * ((bossType === 'heart') ? 1.5 : 1),
+      maxHp: cfg.bossHp * ((bossType === 'heart') ? 1.5 : 1),
+      speed: ((bossType === 'heart') ? 50 : 75)*cfg.speedMul,
+      burstCd: (bossType === 'heart') ? 1.2 : 1.6,
+      dead:false, flash:0, isBoss:true, isHeart: (bossType === 'heart'),
+      bossType: bossType,
+      targetOffsetX:0, targetOffsetY:0, offsetUpdateTimer:0, dodgeTimer:0, dodgeAng:0,
+
+      // Boss 2 specific logic
+      state: 'idle', stateTimer: 0, dashTarget: null, minionCount: 0
+  };
+
+  const title = (bossType === 'heart') ? 'СЕРДЦЕ МЯСОРУБКИ' : ((bossType === 'boss2') ? 'ШЕФ-ПОВАР' : 'БОСС ПРИБЫЛ');
+  const sub = (bossType === 'heart') ? 'ОНО ПУЛЬСИРУЕТ' : ((bossType === 'boss2') ? 'БЕРЕГИСЬ РЫВКА' : 'ВЫЖИВИ');
+
+  spawnBanner(Game,{title: title,subtitle: sub,color:'#d92638'});screenFlash(Game,0.8);screenShake(Game,10);
 }
 
 function killEnemy(Game,e){
@@ -98,24 +123,24 @@ function killEnemy(Game,e){
   if(!Game.loot) Game.loot = [];
 
   // 25% шанс выпадания HP сферы
-  if(Math.random() < 0.10) {
+  if(GameRNG.random() < 0.10) {
     const item = generateLootItem(null, Game.floorIndex || 0, Game.floorIndex || 0);
     let lx = e.x, ly = e.y;
-    if ((item.rarity === 'epic' || item.rarity === 'legendary') && Game.enemies.length > 2 && Math.random() < 0.5) {
+    if ((item.rarity === 'epic' || item.rarity === 'legendary') && Game.enemies.length > 2 && GameRNG.random() < 0.5) {
       // Риск/награда: спавним эпик/легендарку рядом с группой живых врагов
-      let target = Game.enemies[Math.floor(Math.random() * Game.enemies.length)];
+      let target = Game.enemies[Math.floor(GameRNG.random() * Game.enemies.length)];
       if (!target.dead && target !== e) {
-        lx = target.x + (Math.random()-0.5)*40;
-        ly = target.y + (Math.random()-0.5)*40;
+        lx = target.x + (GameRNG.random()-0.5)*40;
+        ly = target.y + (GameRNG.random()-0.5)*40;
       }
     }
     Game.loot.push({x: lx, y: ly, type: 'item', item: item, r: 10, t: 0});
-  } else if(Math.random() < 0.25){
+  } else if(GameRNG.random() < 0.25){
     Game.loot.push({x: e.x, y: e.y, type: 'hp', r: 8});
   }
   // 30% шанс выпадания очков мощи
-  else if(Math.random() < 0.3){
-    const rand = Math.random();
+  else if(GameRNG.random() < 0.3){
+    const rand = GameRNG.random();
     const color = rand < 0.05 ? '#ff6600' : (rand < 0.2 ? '#e8a317' : (rand < 0.5 ? '#0ea5c7' : '#ffffff'));
     Game.loot.push({x: e.x, y: e.y, type: 'weapon', color: color, r: 10});
   }
@@ -125,7 +150,7 @@ function killEnemy(Game,e){
     burst(Game,e.x,e.y,80,'#d92638',450,150);
     screenFlash(Game,1.0);screenShake(Game,15);
     spawnFloatingText(Game,e.x,e.y-40,e.isHeart ? 'СЕРДЦЕ ОСТАНОВЛЕНО' : 'BOSS SLAIN', e.isHeart ? '#ff0000' : '#e8a317');
-    Game.loot.push({x: e.x, y: e.y, type: 'item', item: generateLootItem(Math.random() > 0.5 ? 'legendary' : 'epic', Game.floorIndex || 0), r: 10, t: 0}); Game.onBossDefeated();
+    Game.loot.push({x: e.x, y: e.y, type: 'item', item: generateLootItem(GameRNG.random() > 0.5 ? 'legendary' : 'epic', Game.floorIndex || 0), r: 10, t: 0}); Game.onBossDefeated();
     if (typeof checkContractsOnBossKill === 'function') checkContractsOnBossKill(Game);
     return;
   }
@@ -139,13 +164,13 @@ function killEnemy(Game,e){
     Game.wave++; Game.bossSpawnedThisWave=false;
     if (typeof checkContractsOnWaveStart === 'function') checkContractsOnWaveStart(Game.wave);
     const item = generateLootItem(null, Game.floorIndex || 0, Game.floorIndex || 0);
-    let lx = Game.player.x + (Math.random()-0.5)*40;
-    let ly = Game.player.y + (Math.random()-0.5)*40;
-    if ((item.rarity === 'epic' || item.rarity === 'legendary') && Game.enemies.length > 2 && Math.random() < 0.5) {
-      let target = Game.enemies[Math.floor(Math.random() * Game.enemies.length)];
+    let lx = Game.player.x + (GameRNG.random()-0.5)*40;
+    let ly = Game.player.y + (GameRNG.random()-0.5)*40;
+    if ((item.rarity === 'epic' || item.rarity === 'legendary') && Game.enemies.length > 2 && GameRNG.random() < 0.5) {
+      let target = Game.enemies[Math.floor(GameRNG.random() * Game.enemies.length)];
       if (!target.dead) {
-        lx = target.x + (Math.random()-0.5)*40;
-        ly = target.y + (Math.random()-0.5)*40;
+        lx = target.x + (GameRNG.random()-0.5)*40;
+        ly = target.y + (GameRNG.random()-0.5)*40;
       }
     }
     Game.loot.push({x: lx, y: ly, type: 'item', item: item, r: 10, t: 0});
@@ -159,9 +184,9 @@ function updateEnemies(Game,sdt){
 
     e.offsetUpdateTimer -= sdt;
     if(e.offsetUpdateTimer <= 0) {
-      e.targetOffsetX = (Math.random() - 0.5) * 80;
-      e.targetOffsetY = (Math.random() - 0.5) * 80;
-      e.offsetUpdateTimer = 1.0 + Math.random();
+      e.targetOffsetX = (GameRNG.random() - 0.5) * 80;
+      e.targetOffsetY = (GameRNG.random() - 0.5) * 80;
+      e.offsetUpdateTimer = 1.0 + GameRNG.random();
     }
     const targetX = p.x + e.targetOffsetX;
     const targetY = p.y + e.targetOffsetY;
@@ -179,8 +204,70 @@ function updateEnemies(Game,sdt){
 
     const oldX = e.x, oldY = e.y;
     let attemptedMove = false;
+    e.vx = c * e.speed;
+    e.vy = s * e.speed; // Save for visual rotation later
 
-    if(e.isBoss){attemptedMove=true;moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);e.burstCd-=sdt;if(e.burstCd<=0){e.burstCd=2.2;for(let k=0;k<12;k++){const a=(k/12)*Math.PI*2;Game.bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,friendly:false,dmg:1,pierce:1,dead:false,color:'#d92638'});}}
+    if(e.isBoss){
+        if (e.bossType === 'boss2') {
+            e.stateTimer -= sdt;
+            if (e.state === 'idle') {
+                attemptedMove = true;
+                moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);
+                if (e.stateTimer <= 0) {
+                    if (GameRNG.random() > 0.4 && e.minionCount === 0) {
+                        e.state = 'summon';
+                        e.stateTimer = 1.0;
+                    } else {
+                        e.state = 'telegraph';
+                        e.stateTimer = 1.0;
+                        e.dashTarget = {x: p.x, y: p.y};
+                    }
+                }
+            } else if (e.state === 'telegraph') {
+                // Stand still, aiming at dash target
+            } else if (e.state === 'dash') {
+                const dashAng = Math.atan2(e.dashTarget.y - e.y, e.dashTarget.x - e.x);
+                moveWithCollision(Game.map, e, Math.cos(dashAng) * 600 * sdt, Math.sin(dashAng) * 600 * sdt);
+                if (e.stateTimer <= 0) { e.state = 'idle'; e.stateTimer = 1.5; }
+            } else if (e.state === 'summon') {
+                // Stand still, invulnerable (handled in hit logic)
+                if (e.stateTimer <= 0) {
+                    // Spawn minions
+                    const minionsToSpawn = 3;
+                    for (let m=0; m<minionsToSpawn; m++) {
+                        Game.enemies.push({
+                            x: e.x + (GameRNG.random()-0.5)*100, y: e.y + (GameRNG.random()-0.5)*100,
+                            r: ENEMY_BASE.kamikaze.r, type: 'kamikaze', hp: 5, maxHp: 5,
+                            speed: ENEMY_BASE.kamikaze.speed * 1.2, dead: false, flash: 0,
+                            targetOffsetX: 0, targetOffsetY: 0, offsetUpdateTimer: 0, dodgeTimer: 0, dodgeAng: 0, isMinion: true
+                        });
+                        e.minionCount++;
+                    }
+                    e.state = 'invulnerable';
+                    e.stateTimer = 5.0; // max time in invuln phase
+                }
+            } else if (e.state === 'invulnerable') {
+                attemptedMove = true;
+                moveWithCollision(Game.map,e,-c*e.speed*0.5*sdt,-s*e.speed*0.5*sdt); // slowly back away
+                // Check if minions are dead
+                let aliveMinions = 0;
+                for (let j=0; j<Game.enemies.length; j++) if (Game.enemies[j].isMinion && !Game.enemies[j].dead) aliveMinions++;
+                if (aliveMinions === 0 || e.stateTimer <= 0) {
+                    e.minionCount = 0;
+                    e.state = 'idle';
+                    e.stateTimer = 2.0;
+                }
+            }
+
+            if (e.state === 'telegraph' && e.stateTimer <= 0) {
+                e.state = 'dash';
+                e.stateTimer = 0.5; // dash duration
+                // Don't update dash target here to dash in the telegraphed direction
+            }
+
+        } else {
+            attemptedMove=true;moveWithCollision(Game.map,e,c*e.speed*sdt,s*e.speed*sdt);e.burstCd-=sdt;if(e.burstCd<=0){e.burstCd=2.2;for(let k=0;k<12;k++){const a=(k/12)*Math.PI*2;Game.bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,friendly:false,dmg:1,pierce:1,dead:false,color:'#d92638'});}}
+        }
     }else if(e.type==='shooter'){
       const los=raycastClear(Game.map,e.x,e.y,p.x,p.y);const dist=Math.hypot(p.x-e.x,p.y-e.y);const near=dist<80;
       const flee = e.hp < e.maxHp * 0.3;
@@ -213,8 +300,8 @@ function updateEnemies(Game,sdt){
     if (attemptedMove && (!e.dodgeTimer || e.dodgeTimer <= 0)) {
       const movedDist = Math.hypot(e.x - oldX, e.y - oldY);
       if (movedDist < e.speed * sdt * 0.1) {
-        e.dodgeTimer = 0.5 + Math.random() * 0.5;
-        e.dodgeAng = Math.atan2(targetY-e.y,targetX-e.x) + (Math.random() < 0.5 ? Math.PI/2 : -Math.PI/2);
+        e.dodgeTimer = 0.5 + GameRNG.random() * 0.5;
+        e.dodgeAng = Math.atan2(targetY-e.y,targetX-e.x) + (GameRNG.random() < 0.5 ? Math.PI/2 : -Math.PI/2);
       }
     }
 

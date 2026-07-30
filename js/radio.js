@@ -54,7 +54,7 @@ function queueRadioMessage(type) {
   else if (type === 'legendary') pool = RADIO_STRINGS.legendary;
   else return;
 
-  const msg = pool[Math.floor(Math.random() * pool.length)];
+  const msg = pool[Math.floor(GameRNG.random() * pool.length)];
 
   // Floor messages have a delay so they appear after the floor banner
   if (type === 'legendary') {

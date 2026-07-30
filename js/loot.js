@@ -46,7 +46,7 @@ function generateLootItem(forcedRarity, floorIndex = 0) {
     let totalWeight = 0;
     for (const key in tempRarity) totalWeight += tempRarity[key].weight;
 
-    const r = Math.random() * totalWeight;
+    const r = GameRNG.random() * totalWeight;
     let sum = 0;
     for (const [id, data] of Object.entries(tempRarity)) {
       sum += data.weight;
@@ -56,17 +56,17 @@ function generateLootItem(forcedRarity, floorIndex = 0) {
   }
 
   const rarity = LOOT_RARITY[rarityId];
-  const pos = AFFIXES_POS[Math.floor(Math.random() * AFFIXES_POS.length)];
+  const pos = AFFIXES_POS[Math.floor(GameRNG.random() * AFFIXES_POS.length)];
   let posVal = pos.val * rarity.scale;
   if (pos.isInt) posVal = Math.max(1, Math.round(posVal));
   if (pos.isUnique) posVal = pos.val;
 
-  const neg = AFFIXES_NEG[Math.floor(Math.random() * AFFIXES_NEG.length)];
+  const neg = AFFIXES_NEG[Math.floor(GameRNG.random() * AFFIXES_NEG.length)];
   let negVal = neg.val * rarity.scale;
   if (neg.isInt) negVal = Math.round(negVal) || -1;
 
   return {
-    icon: LOOT_ICONS[Math.floor(Math.random() * LOOT_ICONS.length)],
+    icon: LOOT_ICONS[Math.floor(GameRNG.random() * LOOT_ICONS.length)],
     rarity: rarityId, color: rarity.colorVal,
     pos: { id: pos.id, val: posVal, name: pos.name, text: pos.text.replace('X', pos.isUnique ? posVal : Math.abs(pos.isInt ? posVal : Math.round(posVal * 100))) },
     neg: { id: neg.id, val: negVal, name: neg.name, text: neg.text.replace('X', Math.abs(neg.isInt ? negVal : Math.round(negVal * 100))) }

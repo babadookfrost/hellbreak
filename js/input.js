@@ -9,6 +9,7 @@ function initInput(canvas){
     if(e.code==='ShiftLeft'||e.code==='ShiftRight')Input.wantDash=true;
     if(e.code==='KeyR')Input.wantReload=true;
     if(e.code==='Enter'||e.code==='Space')Input.cmd=true;
+    if(e.code==='KeyD')Input.wantDaily=true;
     if(e.code==='KeyI'||e.code==='Tab'){ e.preventDefault(); Input.wantInventory=true; }
   });
   window.addEventListener('keyup',e=>{Input.keys[e.code]=false;
@@ -22,6 +23,9 @@ function initInput(canvas){
       const ux = Game.viewW/2 - uw/2, uy = Game.viewH*0.75 - uh/2;
       if (Input.mouse.x >= ux && Input.mouse.x <= ux+uw && Input.mouse.y >= uy && Input.mouse.y <= uy+uh) {
         Input.clickUpgrades = true;
+        Input.cmd = false;
+      } else if (window.dailyBtnRect && Input.mouse.x >= window.dailyBtnRect.x && Input.mouse.x <= window.dailyBtnRect.x+window.dailyBtnRect.w && Input.mouse.y >= window.dailyBtnRect.y && Input.mouse.y <= window.dailyBtnRect.y+window.dailyBtnRect.h) {
+        Input.wantDaily = true;
         Input.cmd = false;
       }
     }
@@ -49,6 +53,9 @@ function initInput(canvas){
             const ux = Game.viewW/2 - uw/2, uy = Game.viewH*0.75 - uh/2;
             if (Input.mouse.x >= ux && Input.mouse.x <= ux+uw && Input.mouse.y >= uy && Input.mouse.y <= uy+uh) {
               Input.clickUpgrades = true;
+              Input.cmd = false;
+            } else if (window.dailyBtnRect && Input.mouse.x >= window.dailyBtnRect.x && Input.mouse.x <= window.dailyBtnRect.x+window.dailyBtnRect.w && Input.mouse.y >= window.dailyBtnRect.y && Input.mouse.y <= window.dailyBtnRect.y+window.dailyBtnRect.h) {
+              Input.wantDaily = true;
               Input.cmd = false;
             }
           }

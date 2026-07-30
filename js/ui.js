@@ -85,9 +85,11 @@ document.addEventListener('DOMContentLoaded', () => {
       Game.stats = Game.recalcStats();
       spawnBanner(Game, {title: 'ПРЕДМЕТ ЭКИПИРОВАН', subtitle: '', color: Game.pendingLoot.color});
       burst(Game, Game.player.x, Game.player.y, 30, Game.pendingLoot.color, 250);
-      if (Game.pendingLoot.rarity === 'legendary' && Math.random() < 0.3) {
+      if (Game.pendingLoot.rarity === 'legendary' && GameRNG.random() < 0.3) {
         if (typeof queueRadioMessage === 'function') queueRadioMessage('legendary');
       }
+
+      if (typeof tryEvolveWeapon === 'function') tryEvolveWeapon(Game, Game.pendingLoot);
     }
     document.getElementById('loot-compare').style.display = 'none';
     Game.pendingLoot = null;
@@ -171,6 +173,11 @@ function drawHud(){
   ctx.fillStyle='#1a1a1a';ctx.font='bold '+fs+'px monospace';ctx.textAlign='left';
   ctx.fillText('УР:'+(Game.level+1)+' В:'+Game.wave+(Game.boss?' [БОСС]':'')+' КИЛЛ:'+Game.kills,12,28);
 
+  if (Game.isDaily) {
+      ctx.fillStyle='#0ea5c7';ctx.font='bold '+(fs-2)+'px monospace';
+      ctx.fillText(`ДЕЙЛИ-РАН [${DailyMode.seed}]`, 12, 28 + fs + 4);
+  }
+
   const w=WEAPONS[p.weaponId];
   let as=p.reloading>0?'РЕЛОАД...':'['+'●'.repeat(p.ammo)+'○'.repeat(Math.max(0,Math.max(1, w.ammoMax + Game.stats.ammoAdd)-p.ammo))+']';
   ctx.textAlign='right';ctx.fillStyle=p.reloading>0?'#888':'#1a1a1a';
@@ -227,7 +234,25 @@ function drawMenu(){
   ctx.fillStyle='#5a5a5a';ctx.font=ss+'px monospace';
   ctx.fillText('Двигайся — время идёт. Стой — время замирает.',Game.viewW/2,Game.viewH*0.3+ts*0.55);
   ctx.fillStyle='#e8a317';ctx.shadowColor='#e8a317';ctx.shadowBlur=8;
-  ctx.fillText('КЛИК / ТАП / ENTER чтобы начать',Game.viewW/2,Game.viewH*0.3+ts*0.95);
+  ctx.fillText('КЛИК / ТАП / ENTER чтобы начать обычный забег',Game.viewW/2,Game.viewH*0.3+ts*0.95);
+  ctx.shadowBlur=0;
+
+  // Кнопка Дейли-рана (нажатие "D" или кнопка)
+  const bestDaily = DailyMode.getBestScore();
+  const dailyText = bestDaily > 0 ? `ДЕЙЛИ-РАН (СИД: ${getDailySeed()}) - ЛУЧШИЙ СЧЁТ: ${bestDaily}` : `ДЕЙЛИ-РАН (СИД: ${getDailySeed()})`;
+
+  const dailyY = Game.viewH*0.3+ts*0.95 + 40;
+  ctx.fillStyle='#0ea5c7';ctx.shadowColor='#0ea5c7';ctx.shadowBlur=8;
+  ctx.fillText('НАЖМИ "D" или КЛИКНИ СЮДА чтобы начать ' + dailyText, Game.viewW/2, dailyY);
+
+  // Добавим хитбокс для клика
+  window.dailyBtnRect = {
+    x: Game.viewW/2 - 300,
+    y: dailyY - 20,
+    w: 600,
+    h: 40
+  };
+
   ctx.shadowBlur=0;
   const list=Game.leaderboard;
   if(list.length){
@@ -271,7 +296,11 @@ function drawDeathScreen(){
   ctx.fillText('Убито: '+Game.kills+' · Волна: '+Game.wave+' · Этаж: '+(Game.level+1),Game.viewW/2,Game.viewH*0.32+ts*0.6);
   ctx.fillStyle='#0ea5c7';ctx.font='bold '+(ss+2)+'px monospace';
   let shardsText = 'ПОЛУЧЕНО ОСКОЛКОВ: +'+(Game.lastEarnedShards||0);
-  if (Game.lastContractsBonus && Game.lastContractsBonus > 0) {
+  if (DailyMode.active || Game.isDaily || Game.lastEarnedShards === 0 && Game.kills > 0) { // isDaily might be false after death logic runs, but we check if shards are 0 and kills > 0 to assume daily or just check if the date matches some temp flag. Let's just check if DailyMode.savedMeta exists.
+     if (DailyMode.savedMeta || (Game.pendingScore && !Game.lastEarnedShards)) {
+         shardsText = 'ДЕЙЛИ-РАН: ОСКОЛКИ НЕ ВЫДАЮТСЯ';
+     }
+  } else if (Game.lastContractsBonus && Game.lastContractsBonus > 0) {
     shardsText += ` (ВКЛЮЧАЯ БОНУС КОНТРАКТОВ +${Game.lastContractsBonus}%)`;
   }
   ctx.fillText(shardsText,Game.viewW/2,Game.viewH*0.32+ts*0.85);
@@ -279,11 +308,14 @@ function drawDeathScreen(){
   ctx.font=ss+'px monospace';
   ctx.fillText('КЛИК / ТАП / ENTER заново',Game.viewW/2,Game.viewH*0.32+ts*1.15);
   ctx.shadowBlur=0;
-  const list=Game.leaderboard;
+  const list = (DailyMode.savedMeta || (Game.pendingScore && !Game.lastEarnedShards))
+                ? JSON.parse(localStorage.getItem('dailyScores_' + getDailySeed()) || '[]')
+                : Game.leaderboard;
+
   if(list.length){
     const sy=Game.viewH*0.32+ts*1.45;
     ctx.fillStyle='#1a1a1a';ctx.font='bold '+(ss-1)+'px monospace';
-    ctx.fillText('ТАБЛИЦА ЛИДЕРОВ',Game.viewW/2,sy);
+    ctx.fillText((DailyMode.savedMeta || (Game.pendingScore && !Game.lastEarnedShards)) ? 'РЕЗУЛЬТАТЫ ДЕЙЛИ-РАНА ЗА СЕГОДНЯ' : 'ТАБЛИЦА ЛИДЕРОВ',Game.viewW/2,sy);
     ctx.font=(ss-2)+'px monospace';
     for(let i=0;i<Math.min(5,list.length);i++){
       const e=list[i];ctx.fillStyle=i===0?'#e8a317':'#7a7a7a';
