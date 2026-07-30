@@ -80,14 +80,14 @@ function showContractsMenu() {
 
   // Pick 3 random contracts
   let pool = [...CONTRACTS_POOL];
-  pool.sort(() => Math.random() - 0.5);
+  pool.sort(() => GameRNG.random() - 0.5);
   proposedContracts = pool.slice(0, 3);
 
   // For boss_specific_weapon, assign a random weapon
   proposedContracts.forEach(c => {
     if (c.id === 'boss_specific_weapon') {
       const weaponKeys = Object.keys(WEAPONS);
-      const randomWeaponId = weaponKeys[Math.floor(Math.random() * weaponKeys.length)];
+      const randomWeaponId = weaponKeys[Math.floor(GameRNG.random() * weaponKeys.length)];
       c.weaponId = randomWeaponId;
       c.desc = `Убить босса используя ${WEAPONS[randomWeaponId].icon} ${WEAPONS[randomWeaponId].name}`;
     }

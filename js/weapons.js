@@ -5,8 +5,46 @@ const WEAPONS={
   smg:{id:'smg',name:'Автомат',icon:'■',cd:0.09,pellets:1,spread:0,jitter:0.08,speed:1300,dmg:1,ammoMax:30,reload:1.5,pierce:1,auto:true},
   lmg:{id:'lmg',name:'Пулемёт',icon:'●',cd:0.055,pellets:1,spread:0,jitter:0.11,speed:1300,dmg:1,ammoMax:80,reload:2.2,pierce:1,auto:true},
   bow:{id:'bow',name:'Лук',icon:'➤',cd:0.5,pellets:1,spread:0,jitter:0,speed:1000,dmg:4,ammoMax:5,reload:1.0,pierce:99,auto:false},
-  rocket:{id:'rocket',name:'Гранатомёт',icon:'✹',cd:0.85,pellets:1,spread:0,jitter:0,speed:800,dmg:5,ammoMax:4,reload:2.0,pierce:1,auto:false,splash:140}
+  rocket:{id:'rocket',name:'Гранатомёт',icon:'✹',cd:0.85,pellets:1,spread:0,jitter:0,speed:800,dmg:5,ammoMax:4,reload:2.0,pierce:1,auto:false,splash:140},
+
+  // Эволюционировавшее оружие
+  handcannon:{id:'handcannon',name:'Хэндкэннон',icon:'◆+',cd:0.4,pellets:1,spread:0,jitter:0,speed:1400,dmg:6,ammoMax:4,reload:1.0,pierce:1,auto:false,splash:60, evolved:true},
+  sweeper:{id:'sweeper',name:'Подметальщик',icon:'▲+',cd:0.7,pellets:14,spread:0.18,jitter:0.03,speed:1000,dmg:2,ammoMax:3,reload:1.5,pierce:3,auto:false, evolved:true},
+  minigun:{id:'minigun',name:'Миниган',icon:'■+',cd:0.03,pellets:1,spread:0,jitter:0.15,speed:1500,dmg:1,ammoMax:120,reload:2.0,pierce:2,auto:true, ricochet:true, evolved:true},
+  railgun:{id:'railgun',name:'Рейлган',icon:'➤+',cd:0.6,pellets:1,spread:0,jitter:0,speed:2500,dmg:10,ammoMax:3,reload:1.5,pierce:999,auto:false, evolved:true}
 };
+
+const EVOLUTIONS = {
+    'pistol': { affix: 'dmg', target: 'handcannon' },
+    'shotgun': { affix: 'speed', target: 'sweeper' },
+    'smg': { affix: 'ammo_save', target: 'minigun' },
+    'bow': { affix: 'pierce', target: 'railgun' },
+    'lmg': { affix: 'reload_up', target: 'minigun' } // Optional extra mappings
+};
+
+function tryEvolveWeapon(Game, pickedItem) {
+    const currentWeaponId = Game.player.weaponId;
+    if (WEAPONS[currentWeaponId].evolved) return; // Already evolved
+
+    const evoRules = EVOLUTIONS[currentWeaponId];
+    if (evoRules) {
+        // Check if the picked item has the required affix in either pos or neg
+        if (pickedItem.pos.id === evoRules.affix || pickedItem.neg.id === evoRules.affix) {
+
+            Game.player.weaponId = evoRules.target;
+            const w = WEAPONS[evoRules.target];
+            Game.player.ammo = Math.max(1, w.ammoMax + Game.stats.ammoAdd);
+            Game.player.reloading = 0;
+
+            spawnBanner(Game, {title: 'ЭВОЛЮЦИЯ ОРУЖИЯ', subtitle: w.icon + ' ' + w.name.toUpperCase(), color: '#e8a317'});
+            screenFlash(Game, 0.8);
+            burst(Game, Game.player.x, Game.player.y, 50, '#e8a317', 400);
+
+            // Queue radio message if applicable
+            if (typeof queueRadioMessage === 'function') queueRadioMessage('legendary');
+        }
+    }
+}
 let lastShootTime = 0;
 function playSoundShoot(weaponId) {
   const now = Date.now();
@@ -48,13 +86,24 @@ if(idx===-1)return;
 
 function fireWeapon(Game,ax,ay){
   const p=Game.player,w=WEAPONS[p.weaponId];if(p.cd>0||p.ammo<=0||p.reloading>0)return;
-  p.cd=w.cd;if (Math.random() >= Game.stats.ammoSave) p.ammo--;Game.shotSlowmo=0.5;if(p.ammo===0)p.reloading=w.reload*Game.stats.reloadMul;
+  p.cd=w.cd;if (GameRNG.random() >= Game.stats.ammoSave) p.ammo--;Game.shotSlowmo=0.5;if(p.ammo===0)p.reloading=w.reload*Game.stats.reloadMul;
   const ang=Math.atan2(ay-p.y,ax-p.x);const mid=(w.pellets-1)/2;
   for(let i=0;i<w.pellets;i++){
-    const a=ang+(i-mid)*w.spread+(Math.random()-0.5)*w.jitter;
-    Game.bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,r:w.splash?7:4,friendly:true,dmg:w.dmg*Game.stats.dmgMul,pierce:w.pierce+Game.stats.pierceAdd,splash:w.splash||0,dead:false,trail:[],color:w.id==='rocket'?'#d97706':w.id==='bow'?'#0ea5c7':'#e8a317'});
+    const a=ang+(i-mid)*w.spread+(GameRNG.random()-0.5)*w.jitter;
+    Game.bullets.push({
+      x:p.x, y:p.y, vx:Math.cos(a)*w.speed, vy:Math.sin(a)*w.speed,
+      r: w.splash ? 7 : (w.evolved ? 6 : 4),
+      friendly:true,
+      dmg:w.dmg*Game.stats.dmgMul,
+      pierce:w.pierce+Game.stats.pierceAdd,
+      splash:w.splash||0,
+      dead:false, trail:[],
+      color: w.id==='rocket'||w.id==='handcannon' ? '#d97706' : (w.id==='bow'||w.id==='railgun' ? '#0ea5c7' : (w.evolved ? '#ff00ff' : '#e8a317')),
+      ricochet: w.ricochet || false,
+      isRailgun: w.id === 'railgun'
+    });
   }
-  muzzleFlash(Game,p.x,p.y,ang);screenShake(Game,w.id==='rocket'?6:w.id==='shotgun'?4:2);
+  muzzleFlash(Game,p.x,p.y,ang);screenShake(Game,w.splash?8:(w.id==='shotgun'||w.id==='sweeper'?5:2));
   playSoundShoot(w.id);
 }
 
