@@ -207,6 +207,23 @@ class Room {
         }
 
         // ------ Снаряды ------
+        const CELL_SIZE = 100;
+        const grid = new Map();
+        for (let j = 0; j < this.enemies.length; j++) {
+            const e = this.enemies[j];
+            const cx = Math.floor(e.x / CELL_SIZE);
+            const cy = Math.floor(e.y / CELL_SIZE);
+            const key = cx + ',' + cy;
+            let cell = grid.get(key);
+            if (!cell) {
+                cell = [];
+                grid.set(key, cell);
+            }
+            cell.push(e);
+        }
+
+        let enemiesDied = false;
+
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const pr = this.projectiles[i];
             pr.x += pr.vx * dt;
@@ -219,24 +236,43 @@ class Room {
             }
 
             let destroyed = false;
-            for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const e = this.enemies[j];
-                if (pr.hitEnemies.has(e)) continue;
-                if (distSq(pr.x, pr.y, e.x, e.y) < (pr.radius + e.radius) ** 2) {
-                    pr.hitEnemies.add(e);
-                    e.hp -= pr.damage;
-                    if (e.hp <= 0) {
-                        this.gems.push({ x: e.x, y: e.y, xp: e.xp, radius: 4 });
-                        this.enemies.splice(j, 1);
-                        this.kills++;
+            const pcx = Math.floor(pr.x / CELL_SIZE);
+            const pcy = Math.floor(pr.y / CELL_SIZE);
+
+            for (let ox = -1; ox <= 1; ox++) {
+                for (let oy = -1; oy <= 1; oy++) {
+                    const key = (pcx + ox) + ',' + (pcy + oy);
+                    const cell = grid.get(key);
+                    if (!cell) continue;
+
+                    for (let k = 0; k < cell.length; k++) {
+                        const e = cell[k];
+                        if (e.dead) continue;
+                        if (pr.hitEnemies.has(e)) continue;
+                        if (distSq(pr.x, pr.y, e.x, e.y) < (pr.radius + e.radius) ** 2) {
+                            pr.hitEnemies.add(e);
+                            e.hp -= pr.damage;
+                            if (e.hp <= 0) {
+                                e.dead = true;
+                                this.gems.push({ x: e.x, y: e.y, xp: e.xp, radius: 4 });
+                                this.kills++;
+                                enemiesDied = true;
+                            }
+                            if (pr.hitEnemies.size >= pr.pierce) {
+                                destroyed = true;
+                                break;
+                            }
+                        }
                     }
-                    if (pr.hitEnemies.size >= pr.pierce) {
-                        destroyed = true;
-                        break;
-                    }
+                    if (destroyed) break;
                 }
+                if (destroyed) break;
             }
             if (destroyed) this.projectiles.splice(i, 1);
+        }
+
+        if (enemiesDied) {
+            this.enemies = this.enemies.filter(e => !e.dead);
         }
 
         // ------ Враги ------
