@@ -53,6 +53,13 @@ function distSq(x1, y1, x2, y2) {
     return (x2 - x1) ** 2 + (y2 - y1) ** 2;
 }
 
+function removeSwap(arr, index) {
+    const last = arr.pop();
+    if (index < arr.length) {
+        arr[index] = last;
+    }
+}
+
 const COLORS = [
     '#00aaff', '#ff4444', '#44ff44', '#ffaa00',
     '#ff44ff', '#44ffff', '#ffff44', '#ff8844',
@@ -214,7 +221,7 @@ class Room {
             pr.life -= dt;
 
             if (pr.life <= 0) {
-                this.projectiles.splice(i, 1);
+                removeSwap(this.projectiles, i);
                 continue;
             }
 
@@ -227,7 +234,7 @@ class Room {
                     e.hp -= pr.damage;
                     if (e.hp <= 0) {
                         this.gems.push({ x: e.x, y: e.y, xp: e.xp, radius: 4 });
-                        this.enemies.splice(j, 1);
+                        removeSwap(this.enemies, j);
                         this.kills++;
                     }
                     if (pr.hitEnemies.size >= pr.pierce) {
@@ -236,7 +243,7 @@ class Room {
                     }
                 }
             }
-            if (destroyed) this.projectiles.splice(i, 1);
+            if (destroyed) removeSwap(this.projectiles, i);
         }
 
         // ------ Враги ------
@@ -255,7 +262,7 @@ class Room {
             }
 
             if (!nearest) {
-                this.enemies.splice(i, 1);
+                removeSwap(this.enemies, i);
                 continue;
             }
 
@@ -308,7 +315,7 @@ class Room {
                 if (!p.alive) continue;
                 if (distSq(g.x, g.y, p.x, p.y) < (p.radius + g.radius) ** 2) {
                     p.xp += g.xp;
-                    this.gems.splice(i, 1);
+                    removeSwap(this.gems, i);
 
                     // Проверка на левелап
                     let leveled = false;
