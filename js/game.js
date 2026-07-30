@@ -149,10 +149,29 @@ function updatePlayerMove(Game,dt,mx,my){
   const p=Game.player;
   const oldX = p.x, oldY = p.y;
   p.dashCd=Math.max(0,p.dashCd-dt);p.invuln=Math.max(0,p.invuln-dt);
-  let moving=false;
-  if(p.dashT>0){p.dashT-=dt;moveWithCollision(Game.map,p,p.dashDX*900*dt,p.dashDY*900*dt);moving=true;}
-  else if(mx||my){const mag=Math.hypot(mx,my);const walkMul = Input.wantWalk ? 0.5 : 1.0; moveWithCollision(Game.map,p,(mx/mag)*p.speed*walkMul*Game.stats.speedMul*dt,(my/mag)*p.speed*walkMul*Game.stats.speedMul*dt);moving=true;}
-  if(dt > 0) { p.vx = (p.x - oldX) / dt; p.vy = (p.y - oldY) / dt; } else { p.vx = 0; p.vy = 0; }
+  let moving = false;
+  if (p.dashT > 0) {
+    p.dashT -= dt;
+    moveWithCollision(Game.map, p, p.dashDX * 900 * dt, p.dashDY * 900 * dt);
+    moving = true;
+  } else if (mx || my) {
+    const mag = Math.hypot(mx, my);
+    const walkMul = Input.wantWalk ? 0.5 : 1.0;
+    moveWithCollision(
+      Game.map,
+      p,
+      (mx / mag) * p.speed * walkMul * Game.stats.speedMul * dt,
+      (my / mag) * p.speed * walkMul * Game.stats.speedMul * dt
+    );
+    moving = true;
+  }
+  if (dt > 0) {
+    p.vx = (p.x - oldX) / dt;
+    p.vy = (p.y - oldY) / dt;
+  } else {
+    p.vx = 0;
+    p.vy = 0;
+  }
   return moving;
 }
 
@@ -161,8 +180,30 @@ function updateBullets(Game,sdt){
   for(let i=0;i<bullets.length;i++){
     const b=bullets[i];b.x+=b.vx*sdt;b.y+=b.vy*sdt;
     if(b.trail){b.trail.push({x:b.x,y:b.y});if(b.trail.length>8)b.trail.shift();}
-    if(isWallWorld(Game.map,b.x,b.y)){b.dead=true;if(b.splash){for(let j=0;j<targets.length;j++){const e=targets[j];if(e.dead)continue;if(Math.hypot(b.x-e.x,b.y-e.y)<b.splash){e.hp-=b.dmg;e.flash=1;if(e.hp<=0)killEnemy(Game,e);}}burst(Game,b.x,b.y,20,'#d97706',220,300);spawnImpact(Game,b.x,b.y,'#d97706',30);screenShake(Game,5);}else{burst(Game,b.x,b.y,5,'#888',80);spawnImpact(Game,b.x,b.y,'#1a1a1a',12);}continue;}
-    if(b.x<0||b.y<0||b.x>Game.map.pxW||b.y>Game.map.pxH){b.dead=true;}
+    if (isWallWorld(Game.map, b.x, b.y)) {
+      b.dead = true;
+      if (b.splash) {
+        for (let j = 0; j < targets.length; j++) {
+          const e = targets[j];
+          if (e.dead) continue;
+          if (Math.hypot(b.x - e.x, b.y - e.y) < b.splash) {
+            e.hp -= b.dmg;
+            e.flash = 1;
+            if (e.hp <= 0) killEnemy(Game, e);
+          }
+        }
+        burst(Game, b.x, b.y, 20, '#d97706', 220, 300);
+        spawnImpact(Game, b.x, b.y, '#d97706', 30);
+        screenShake(Game, 5);
+      } else {
+        burst(Game, b.x, b.y, 5, '#888', 80);
+        spawnImpact(Game, b.x, b.y, '#1a1a1a', 12);
+      }
+      continue;
+    }
+    if (b.x < 0 || b.y < 0 || b.x > Game.map.pxW || b.y > Game.map.pxH) {
+      b.dead = true;
+    }
 
     if (b.dead && b.isInferno) {
       if (!Game.zones) Game.zones = [];
@@ -172,8 +213,10 @@ function updateBullets(Game,sdt){
     if (b.dead) continue;
 
     if(b.friendly){
-      forNearby(tgrid,b.x,b.y,e=>{
-        if(e.dead||b.dead)return;const rr=b.r+e.r;if(Math.hypot(b.x-e.x,b.y-e.y)<rr){
+      forNearby(tgrid, b.x, b.y, e => {
+        if (e.dead || b.dead) return;
+        const rr = b.r + e.r;
+        if (Math.hypot(b.x - e.x, b.y - e.y) < rr) {
           // Check boss invulnerability
           if (e.isBoss && e.state === 'invulnerable') {
               spawnImpact(Game,b.x,b.y,'#0ea5c7',10);
@@ -184,10 +227,19 @@ function updateBullets(Game,sdt){
 
           const isCrit = GameRNG.random() < 0.15;
           const dmgDealt = isCrit ? b.dmg * 2 : b.dmg;
-          e.hp-=dmgDealt;e.flash=1;playSoundHit(isCrit);
+          e.hp -= dmgDealt;
+          e.flash = 1;
+          playSoundHit(isCrit);
           if (isCrit) burst(Game, e.x, e.y, 30, '#e8a317', 400);
-          spawnFloatingText(Game,e.x,e.y-20,(Math.round(dmgDealt*10)/10).toString(),isCrit?'#e8a317':'#fff');
-          spawnImpact(Game,b.x,b.y,b.color||'#1a1a1a',14);b.pierce--;
+          spawnFloatingText(
+            Game,
+            e.x,
+            e.y - 20,
+            (Math.round(dmgDealt * 10) / 10).toString(),
+            isCrit ? '#e8a317' : '#fff'
+          );
+          spawnImpact(Game, b.x, b.y, b.color || '#1a1a1a', 14);
+          b.pierce--;
           if (b.isIce) e.iceSlow = 1.0;
           if (b.ricochet && !b.dead && b.pierce > 0) {
               // find new target
@@ -211,29 +263,42 @@ function updateBullets(Game,sdt){
           if(e.hp<=0)killEnemy(Game,e);
         }
       });
-      if(b.splash&&b.dead){
-        for(let j=0;j<targets.length;j++){
-          const e=targets[j];if(e.dead)continue;if(Math.hypot(b.x-e.x,b.y-e.y)<b.splash){
+      if (b.splash && b.dead) {
+        for (let j = 0; j < targets.length; j++) {
+          const e = targets[j];
+          if (e.dead) continue;
+          if (Math.hypot(b.x - e.x, b.y - e.y) < b.splash) {
             if (e.isBoss && e.state === 'invulnerable') {
-                spawnFloatingText(Game,e.x,e.y-30,'БЛОК','#0ea5c7');
-                continue;
+              spawnFloatingText(Game, e.x, e.y - 30, 'БЛОК', '#0ea5c7');
+              continue;
             }
 
             const isCrit = GameRNG.random() < 0.15;
             const dmgDealt = isCrit ? b.dmg * 2 : b.dmg;
-            e.hp-=dmgDealt;e.flash=1;playSoundHit(isCrit);
+            e.hp -= dmgDealt;
+            e.flash = 1;
+            playSoundHit(isCrit);
             if (isCrit) burst(Game, e.x, e.y, 30, '#e8a317', 400);
-            spawnFloatingText(Game,e.x,e.y-20,(Math.round(dmgDealt*10)/10).toString(),isCrit?'#e8a317':'#fff');
+            spawnFloatingText(
+              Game,
+              e.x,
+              e.y - 20,
+              (Math.round(dmgDealt * 10) / 10).toString(),
+              isCrit ? '#e8a317' : '#fff'
+            );
             if (b.isIce) e.iceSlow = 1.0;
-            if(e.hp<=0)killEnemy(Game,e);
+            if (e.hp <= 0) killEnemy(Game, e);
           }
         }
-        burst(Game,b.x,b.y,24,'#d97706',250,300);spawnImpact(Game,b.x,b.y,'#d97706',35);screenShake(Game,6);
+        burst(Game, b.x, b.y, 24, '#d97706', 250, 300);
+        spawnImpact(Game, b.x, b.y, '#d97706', 35);
+        screenShake(Game, 6);
       }
-    }else{
-      const p=Game.player,rr=b.r+p.r*0.5;
-      if(p.invuln<=0&&Math.hypot(b.x-p.x,b.y-p.y)<rr){
-        b.dead=true;
+    } else {
+      const p = Game.player;
+      const rr = b.r + p.r * 0.5;
+      if (p.invuln <= 0 && Math.hypot(b.x - p.x, b.y - p.y) < rr) {
+        b.dead = true;
         const pdmg = 10 * Game.stats.dmgTakenMul;
         p.hp -= pdmg;
         p.invuln=1.2;
