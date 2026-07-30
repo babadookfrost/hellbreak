@@ -930,3 +930,7 @@ function drawWorldEntities(){
 }
 
 window.onload=()=>Game.init();
+
+if (typeof module !== 'undefined') {
+  module.exports = { buildGrid, forNearby, CELL };
+}
