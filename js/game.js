@@ -583,24 +583,25 @@ function updateBullets(Game, sdt) {
 
       // Heart of the Void (Void Shard Evo) splash damage on death
       if (b.isVoidEvo && b.splash) {
-          for (let j = 0; j < targets.length; j++) {
-            const e = targets[j];
-            if (e.dead) continue;
-            if (Math.hypot(b.x - e.x, b.y - e.y) < b.splash) {
-              e.hp -= b.dmg;
-              e.flash = 1;
-              if (e.hp <= 0) killEnemy(Game, e);
-            }
+        for (let j = 0; j < targets.length; j++) {
+          const e = targets[j];
+          if (e.dead) continue;
+          if (Math.hypot(b.x - e.x, b.y - e.y) < b.splash) {
+            e.hp -= b.dmg;
+            e.flash = 1;
+            if (e.hp <= 0) killEnemy(Game, e);
           }
-          burst(Game, b.x, b.y, 24, "#4b0082", 250, 300);
-          spawnImpact(Game, b.x, b.y, "#4b0082", 35);
-          screenShake(Game, 8);
+        }
+        burst(Game, b.x, b.y, 24, "#4b0082", 250, 300);
+        spawnImpact(Game, b.x, b.y, "#4b0082", 35);
+        screenShake(Game, 8);
       }
 
       continue;
     }
 
-    if (b.friendly) {      forNearby(tgrid, b.x, b.y, (e) => {
+    if (b.friendly) {
+      forNearby(tgrid, b.x, b.y, (e) => {
         if (e.dead || b.dead) return;
         const rr = b.r + e.r;
         if (Math.hypot(b.x - e.x, b.y - e.y) < rr) {
@@ -930,6 +931,39 @@ const Game = {
     Input.cmd = false;
   },
   update(dt) {
+    // Sync main menu overlay
+    const mainMenuEl = document.getElementById("main-menu");
+    if (mainMenuEl) {
+      if (this.state === "menu") {
+        if (mainMenuEl.style.display !== "flex") {
+          mainMenuEl.style.display = "flex";
+          if (typeof renderMainMenuUI === "function") {
+            renderMainMenuUI();
+          }
+        }
+      } else {
+        if (mainMenuEl.style.display !== "none") {
+          mainMenuEl.style.display = "none";
+        }
+      }
+    }
+
+    // Sync HUD element visibility based on state
+    const isPlaying = this.state === "play";
+    const touchUI = document.getElementById("touch-ui");
+    const hudInventory = document.getElementById("hud-inventory");
+    const desktopHints = document.querySelector(".desktop-hints");
+
+    if (touchUI) {
+      touchUI.style.display = isPlaying ? "" : "none";
+    }
+    if (hudInventory) {
+      hudInventory.style.display = isPlaying ? "" : "none";
+    }
+    if (desktopHints) {
+      desktopHints.style.display = isPlaying ? "" : "none";
+    }
+
     if (this.zones && this.zones.length > 0) {
       let aliveZones = [];
       const tgrid = buildGrid(

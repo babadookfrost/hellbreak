@@ -90,13 +90,19 @@ function showInventoryMenu() {
     if (!item) continue;
 
     const el = document.createElement("div");
-    el.style.cssText = `border: 2px solid ${item.color}; border-radius: 6px; padding: 12px; display: flex; gap: 16px; align-items: center; background: #faf8f4;`;
+    el.className = "universal-card available";
+    el.style.border = `2px solid ${item.color}`;
+    el.style.marginBottom = "var(--sp-sm)";
+
     el.innerHTML = `
-      <div style="font-size:32px; color:${item.color}; border: 1px solid ${item.color}; border-radius:4px; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">${item.icon}</div>
-      <div style="flex:1;">
-        <div style="font-weight:bold; color:${item.color};">${LOOT_RARITY[item.rarity].name.toUpperCase()}</div>
-        <div style="font-size:14px; font-weight:bold; color:#10b981;">${item.pos.text}</div>
-        <div style="font-size:14px; font-weight:bold; color:#d92638;">${item.neg.text}</div>      </div>
+      <div class="card-content">
+        <div class="card-header">
+          <div style="font-size:28px; color:${item.color}; margin-right:var(--sp-sm); display:inline-block; vertical-align:middle;">${item.icon}</div>
+          <div class="card-title" style="color:${item.color}; display:inline-block; vertical-align:middle;">${LOOT_RARITY[item.rarity].name.toUpperCase()}</div>
+        </div>
+        <div class="text-body" style="font-weight:bold; color:#10b981;">${item.pos.text}</div>
+        <div class="text-body" style="font-weight:bold; color:#d92638;">${item.neg.text}</div>
+      </div>
     `;
     list.appendChild(el);
   }
@@ -152,6 +158,42 @@ window.showTutorial = function () {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+  const btnStart = document.getElementById("btn-menu-start");
+  if (btnStart) {
+    btnStart.onclick = () => {
+      if (!metaState.unlockedOperators)
+        metaState.unlockedOperators = ["recruit"];
+      if (!metaState.lastOperator) metaState.lastOperator = "recruit";
+      Game.state = "operator-select";
+      document.getElementById("main-menu").style.display = "none";
+      document.getElementById("operator-select-menu").style.display = "flex";
+      renderOperatorsUI();
+    };
+  }
+
+  const btnDaily = document.getElementById("btn-menu-daily");
+  if (btnDaily) {
+    btnDaily.onclick = () => {
+      document.getElementById("main-menu").style.display = "none";
+      DailyMode.start(Game);
+    };
+  }
+
+  const btnUpgrades = document.getElementById("btn-menu-upgrades");
+  if (btnUpgrades) {
+    btnUpgrades.onclick = () => {
+      document.getElementById("upgrades-menu").style.display = "flex";
+      renderUpgradesUI();
+    };
+  }
+
+  const btnSettings = document.getElementById("btn-menu-settings");
+  if (btnSettings) {
+    btnSettings.onclick = () => {
+      document.getElementById("settings-menu").style.display = "flex";
+    };
+  }
+
   const btnTutNext = document.getElementById("btn-tutorial-next");
   if (btnTutNext) {
     btnTutNext.onclick = () => {
@@ -691,132 +733,56 @@ function drawMenu() {
   g.addColorStop(1, "#f5f0e8");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, Game.viewW, Game.viewH);
-  const ts = Math.min(85, Game.viewW / 9);
-  ctx.shadowColor = "#d92638";
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = Game.isEvac ? "#0ea5c7" : "#d92638";
-  ctx.shadowColor = Game.isEvac ? "#0ea5c7" : "#d92638";
-  ctx.font = "bold " + ts + "px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("М Я С О Р У Б К А", Game.viewW / 2, Game.viewH * 0.3);
-  ctx.shadowBlur = 0;
-  const ss = Math.max(13, Math.min(18, Game.viewW / 38));
-  ctx.fillStyle = "#5a5a5a";
-  ctx.font = ss + "px monospace";
-  ctx.fillText(
-    "Двигайся — время идёт. Стой — время замирает.",
-    Game.viewW / 2,
-    Game.viewH * 0.3 + ts * 0.55,
-  );
-  ctx.fillStyle = "#e8a317";
-  ctx.shadowColor = "#e8a317";
-  ctx.shadowBlur = 8;
-  ctx.fillText(
-    "КЛИК / ТАП / ENTER чтобы начать обычный забег",
-    Game.viewW / 2,
-    Game.viewH * 0.3 + ts * 0.95,
-  );
-  ctx.shadowBlur = 0;
-
-  // Кнопка Дейли-рана (нажатие "D" или кнопка)
-  const bestDaily = DailyMode.getBestScore();
-  const dailyText =
-    bestDaily > 0
-      ? `ДЕЙЛИ-РАН (СИД: ${getDailySeed()}) - ЛУЧШИЙ СЧЁТ: ${bestDaily}`
-      : `ДЕЙЛИ-РАН (СИД: ${getDailySeed()})`;
-
-  const dailyY = Game.viewH * 0.3 + ts * 0.95 + 40;
-  ctx.fillStyle = "#0ea5c7";
-  ctx.shadowColor = "#0ea5c7";
-  ctx.shadowBlur = 8;
-  ctx.fillText(
-    'НАЖМИ "D" или КЛИКНИ СЮДА чтобы начать ' + dailyText,
-    Game.viewW / 2,
-    dailyY,
-  );
-
-  // Добавим хитбокс для клика
-  window.dailyBtnRect = {
-    x: Game.viewW / 2 - 300,
-    y: dailyY - 20,
-    w: 600,
-    h: 40,
-  };
-
-  ctx.shadowBlur = 0;
-  const list = Game.leaderboard;
-  if (list.length) {
-    const sy = Game.viewH * 0.3 + ts * 1.35;
-    ctx.fillStyle = "#1a1a1a";
-    ctx.font = "bold " + ss + "px monospace";
-    ctx.fillText("ТАБЛИЦА ЛИДЕРОВ", Game.viewW / 2, sy);
-    ctx.font = ss - 2 + "px monospace";
-    for (let i = 0; i < Math.min(5, list.length); i++) {
-      const e = list[i];
-      ctx.fillStyle = i === 0 ? "#e8a317" : "#7a7a7a";
-      ctx.fillText(
-        i +
-          1 +
-          ". " +
-          e.name +
-          " — " +
-          e.score +
-          " очк. (ур." +
-          e.level +
-          ", волна " +
-          e.wave +
-          ")",
-        Game.viewW / 2,
-        sy + 28 + i * (ss + 4),
-      );
-    }
-  }
-
-  // Draw Upgrades Button
-  const uw = 200,
-    uh = 40;
-  const ux = Game.viewW / 2 - uw / 2,
-    uy = Game.viewH * 0.75 - uh / 2;
-  const hover =
-    Input.mouse.x >= ux &&
-    Input.mouse.x <= ux + uw &&
-    Input.mouse.y >= uy &&
-    Input.mouse.y <= uy + uh;
-  ctx.fillStyle = hover ? "#e8a317" : "rgba(232,163,23,0.2)";
-  ctx.strokeStyle = "#e8a317";
-  ctx.lineWidth = 2;
-  ctx.fillRect(ux, uy, uw, uh);
-  ctx.strokeRect(ux, uy, uw, uh);
-  ctx.fillStyle = hover ? "#1a1a1a" : "#e8a317";
-  ctx.font = "bold 16px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("ПРОКАЧКА", Game.viewW / 2, uy + 25);
-
-  // Draw Settings Button
-  const suw = 200,
-    suh = 40;
-  const sux = Game.viewW / 2 - suw / 2,
-    suy = Game.viewH * 0.75 + 50 - suh / 2;
-  const shover =
-    Input.mouse.x >= sux &&
-    Input.mouse.x <= sux + suw &&
-    Input.mouse.y >= suy &&
-    Input.mouse.y <= suy + suh;
-  ctx.fillStyle = shover ? "#e8a317" : "rgba(232,163,23,0.2)";
-  ctx.strokeStyle = "#e8a317";
-  ctx.lineWidth = 2;
-  ctx.fillRect(sux, suy, suw, suh);
-  ctx.strokeRect(sux, suy, suw, suh);
-  ctx.fillStyle = shover ? "#1a1a1a" : "#e8a317";
-  ctx.font = "bold 16px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("НАСТРОЙКИ", Game.viewW / 2, suy + 25);
-
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillText(`ОСКОЛКИ: ${metaState.shards}`, 10, 20);
   ctx.restore();
 }
+
+function renderMainMenuUI() {
+  const shardsCount = typeof metaState !== "undefined" ? metaState.shards : 0;
+  const shardsEl = document.getElementById("menu-shards-display");
+  if (shardsEl) {
+    shardsEl.innerText = `ОСКОЛКИ: ${shardsCount}`;
+  }
+
+  const bestDaily =
+    typeof DailyMode !== "undefined" ? DailyMode.getBestScore() : 0;
+  const seed = typeof getDailySeed === "function" ? getDailySeed() : "--";
+  const dailyBtn = document.getElementById("btn-menu-daily");
+  if (dailyBtn) {
+    const dailyText =
+      bestDaily > 0
+        ? `ДЕЙЛИ-РАН (СИД: ${seed}) - ЛУЧШИЙ СЧЁТ: ${bestDaily}`
+        : `ДЕЙЛИ-РАН (СИД: ${seed})`;
+    dailyBtn.innerText = dailyText;
+  }
+
+  const list = Game.leaderboard || loadLeaderboard();
+  const lbContainer = document.getElementById("menu-leaderboard-list");
+  if (lbContainer) {
+    lbContainer.innerHTML = "";
+    if (!list || list.length === 0) {
+      lbContainer.innerHTML =
+        '<div style="color: #777; font-size: 12px; text-align: center; padding: 12px 0;">Таблица лидеров пуста</div>';
+    } else {
+      for (let i = 0; i < Math.min(5, list.length); i++) {
+        const e = list[i];
+        const entryEl = document.createElement("div");
+        entryEl.className = "leaderboard-entry" + (i === 0 ? " top-1" : "");
+        entryEl.style.cssText =
+          "display: flex; justify-content: space-between; font-size: 12px; color: #5a5a5a; padding: 4px 0;";
+        if (i === 0) {
+          entryEl.style.color = "var(--ind)";
+          entryEl.style.fontWeight = "bold";
+        }
+        entryEl.innerHTML = `
+          <span>${i + 1}. ${e.name}</span>
+          <span>${e.score} очк. (ур. ${e.level || 1})</span>
+        `;
+        lbContainer.appendChild(entryEl);
+      }
+    }
+  }
+}
+window.renderMainMenuUI = renderMainMenuUI;
 
 function drawDeathScreen() {
   ctx.fillStyle = "rgba(245,240,232,0.85)";
@@ -959,16 +925,23 @@ function renderOperatorsUI() {
     const isSelected = metaState.lastOperator === opId;
 
     const row = document.createElement("div");
-    row.style.cssText = `display:flex; justify-content:space-between; align-items:center; padding:12px; border:2px solid ${isSelected ? "var(--ind)" : "#ccc"}; border-radius:8px; background:${isSelected ? "#e8f4f8" : isUnlocked ? "#faf8f4" : "#eee"}; cursor:${isUnlocked ? "pointer" : "not-allowed"}; opacity:${isUnlocked ? "1" : "0.6"};`;
+    row.className =
+      "universal-card " +
+      (isSelected ? "owned" : isUnlocked ? "available" : "unavailable");
+    row.style.marginBottom = "var(--sp-sm)";
+    row.style.cursor = isUnlocked ? "pointer" : "not-allowed";
 
     row.innerHTML = `
-      <div style="flex:1;">
-        <div style="font-weight:bold; color:var(--bone); font-size:16px;">${op.name} ${isSelected ? '<span style="color:var(--ind); font-size:12px;">[ВЫБРАН]</span>' : ""}</div>
-        <div style="font-size:12px; color:#5a5a5a; margin-top:4px;">${op.desc}</div>
-        <div style="font-size:11px; color:var(--blood); margin-top:4px; font-weight:bold;">${op.statsText}</div>
-        ${!isUnlocked ? `<div style="font-size:11px; color:#d92638; margin-top:4px; font-weight:bold;">ЗАБЛОКИРОВАНО (ЦЕНА: ${op.cost} ОСК. В МЕНЮ ПРОКАЧКИ)</div>` : ""}
+      <div class="card-content">
+        <div class="card-header">
+          <div class="card-title">${op.name}</div>
+        </div>
+        <div class="text-body">${op.desc}</div>
+        <div class="text-small" style="color:var(--blood); font-weight:bold;">${op.statsText}</div>
+        ${!isUnlocked ? `<div class="text-small" style="color:var(--blood); font-weight:bold; margin-top:4px;">ЗАБЛОКИРОВАНО (ЦЕНА: ${op.cost} ОСК. В ПРОКАЧКЕ)</div>` : ""}
       </div>
-      <div style="width:40px; height:40px; border-radius:50%; background:${op.color1}; display:flex; justify-content:center; align-items:center; border:2px solid ${op.color2};">
+      ${isSelected ? `<div class="card-badge">ВЫБРАН</div>` : ""}
+      <div style="width:40px; height:40px; border-radius:50%; background:${op.color1}; display:flex; justify-content:center; align-items:center; border:2px solid ${op.color2}; flex-shrink: 0; margin-left: var(--sp-md);">
          <div style="width:16px; height:6px; background:${op.color2};"></div>
       </div>
     `;
