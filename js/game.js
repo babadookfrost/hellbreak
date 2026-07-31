@@ -1855,15 +1855,19 @@ function drawWorldEntities() {
         ? "#0ea5c7"
         : e.isBoss
           ? "#d92638"
-          : e.type === "shooter"
-            ? "#b829dd"
-            : e.type === "tank"
-              ? "#5a3a86"
-              : e.type === "kamikaze"
-                ? "#d97706"
-                : e.type === "sniper"
-                  ? "#ff00ff"
-                  : "#d92638";
+          : e.type === "rider_scout"
+            ? "#ff6600"
+            : e.type === "rider_taran"
+              ? "#ff3300"
+              : e.type === "shooter"
+                ? "#b829dd"
+                : e.type === "tank"
+                  ? "#5a3a86"
+                  : e.type === "kamikaze"
+                    ? "#d97706"
+                    : e.type === "sniper"
+                      ? "#ff00ff"
+                      : "#d92638";
 
     if (e.isBoss && e.state === "invulnerable") {
       ctx.shadowColor = "#0ea5c7";
@@ -1912,7 +1916,70 @@ function drawWorldEntities() {
     }
     ctx.shadowBlur = 0;
 
-    if (window.tinyDungeonLoaded) {
+    if (e.type === "rider_scout" || e.type === "rider_taran") {
+      const accentColor = e.type === "rider_scout" ? "#ff6600" : "#ff3300";
+      const isFlash = e.flash > 0;
+
+      ctx.fillStyle = isFlash ? "#ffffff" : accentColor;
+      ctx.strokeStyle = isFlash ? "#ffffff" : "#1a1a1a";
+      ctx.lineWidth = 2.5;
+
+      // Draw Unicycle Wheel (centered)
+      ctx.save();
+      // Let's animate wheel rotation
+      const rotSpeed = e.type === "rider_scout" ? 0.025 : 0.015;
+      ctx.rotate(Date.now() * rotSpeed);
+
+      // Outer rim
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r * 0.75, 0, Math.PI * 2);
+      ctx.stroke();
+      if (!isFlash) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.fill();
+      }
+
+      // Spokes
+      ctx.beginPath();
+      for (let s = 0; s < 4; s++) {
+        const angle = (s * Math.PI) / 2;
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(angle) * e.r * 0.75, Math.sin(angle) * e.r * 0.75);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw Frame and Seat (drawn facing right, i.e., positive X)
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-e.r * 0.2, -e.r * 0.3); // Frame going up-back
+      ctx.lineTo(e.r * 0.1, -e.r * 0.3);  // Seat
+      ctx.stroke();
+
+      // Draw Rider Body (torso and head)
+      ctx.fillStyle = isFlash ? "#ffffff" : accentColor;
+      ctx.beginPath();
+      // Torso tilted forward (leaning right)
+      ctx.moveTo(-e.r * 0.4, -e.r * 0.3);
+      ctx.lineTo(e.r * 0.3, -e.r * 0.5);
+      ctx.lineTo(e.r * 0.1, -e.r * 0.9);
+      ctx.lineTo(-e.r * 0.4, -e.r * 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Head
+      ctx.beginPath();
+      ctx.arc(e.r * 0.15, -e.r * 1.05, e.r * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing Eye (small white slit or dot facing right)
+      if (!isFlash) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(e.r * 0.25, -e.r * 1.15, e.r * 0.15, e.r * 0.1);
+      }
+    } else if (window.tinyDungeonLoaded) {
       const coords = getEnemyTileCoords(e);
       const outlineColor = e.flash > 0 ? "#ffffff" : bc;
       const outlinedTile = getCachedOutlinedTile(coords.x, coords.y, outlineColor);

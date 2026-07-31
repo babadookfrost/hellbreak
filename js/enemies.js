@@ -4,6 +4,8 @@ const ENEMY_BASE = {
   tank: { hp: 6, speed: 95, r: 22 },
   kamikaze: { hp: 1, speed: 220, r: 14 },
   sniper: { hp: 2, speed: 40, r: 14, fireCd: 3.0, bulletSpeed: 900 },
+  rider_scout: { hp: 4, speed: 175, r: 16 },
+  rider_taran: { hp: 9, speed: 120, r: 20 },
 };
 
 function getLevelConfig(li, wave = 1) {
@@ -88,9 +90,43 @@ function playSoundDeath(type) {
   osc.stop(audioCtx.currentTime + dur);
 }
 
+function playRiderLaugh() {
+  if (!audioInitialized) return;
+  const vol = typeof getSFXVolume === "function" ? getSFXVolume() : 0.5;
+  const v = vol / 0.5;
+  const now = audioCtx.currentTime;
+  const tones = [520, 440, 360];
+  const duration = 0.08;
+  const gap = 0.12;
+
+  tones.forEach((freq, idx) => {
+    const startTime = now + idx * gap;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(freq, startTime);
+    osc.frequency.exponentialRampToValueAtTime(freq - 100, startTime + duration);
+
+    gain.gain.setValueAtTime(0.06 * v, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  });
+}
+
 function spawnEnemy(Game) {
-  const cfg = getLevelConfig(Game.level, Game.wave),
-    type = cfg.enemyTypes[Math.floor(GameRNG.random() * cfg.enemyTypes.length)];
+  const cfg = getLevelConfig(Game.level, Game.wave);
+  const hasActiveRider = Game.enemies.some(e => !e.dead && (e.type === 'rider_scout' || e.type === 'rider_taran'));
+  const isRiderSpawn = Game.wave >= 3 && !hasActiveRider && GameRNG.random() < 0.12;
+  const type = isRiderSpawn
+    ? (GameRNG.random() < 0.5 ? 'rider_scout' : 'rider_taran')
+    : cfg.enemyTypes[Math.floor(GameRNG.random() * cfg.enemyTypes.length)];
+
   const base = ENEMY_BASE[type];
   const vs = Math.max(Game.effViewW || Game.viewW, Game.effViewH || Game.viewH);
   const spot = randomFloorTileFar(
@@ -121,6 +157,7 @@ function spawnEnemy(Game) {
     offsetUpdateTimer: 0,
     dodgeTimer: 0,
     dodgeAng: 0,
+    laughTimer: isRiderSpawn ? 3 + GameRNG.random() * 2 : 0,
   });
 }
 
@@ -219,31 +256,45 @@ function killEnemy(Game, e) {
 
   if (!Game.loot) Game.loot = [];
 
-  // 25% шанс выпадания HP сферы
-  if (GameRNG.random() < 0.1) {
-    const item = generateLootItem(
-      null,
-      Game.floorIndex || 0,
-      Game.floorIndex || 0,
-    );
-    let lx = e.x,
-      ly = e.y;
-    if (
-      (item.rarity === "epic" || item.rarity === "legendary") &&
-      Game.enemies.length > 2 &&
-      GameRNG.random() < 0.5
-    ) {
-      // Риск/награда: спавним эпик/легендарку рядом с группой живых врагов
-      let target =
-        Game.enemies[Math.floor(GameRNG.random() * Game.enemies.length)];
-      if (!target.dead && target !== e) {
-        lx = target.x + (GameRNG.random() - 0.5) * 40;
-        ly = target.y + (GameRNG.random() - 0.5) * 40;
-      }
+  if (e.type === "rider_scout" || e.type === "rider_taran") {
+    let rarityId = "rare";
+    const rand = GameRNG.random();
+    if (rand < 0.05) {
+      rarityId = "legendary";
+    } else if (rand < 0.25) {
+      rarityId = "epic";
+    } else {
+      rarityId = "rare";
     }
-    Game.loot.push({ x: lx, y: ly, type: "item", item: item, r: 10, t: 0 });
-  } else if (GameRNG.random() < 0.25) {
-    Game.loot.push({ x: e.x, y: e.y, type: "hp", r: 8 });
+    const item = generateLootItem(rarityId, Game.floorIndex || 0);
+    Game.loot.push({ x: e.x, y: e.y, type: "item", item: item, r: 10, t: 0 });
+  } else {
+    // 25% шанс выпадания HP сферы
+    if (GameRNG.random() < 0.1) {
+      const item = generateLootItem(
+        null,
+        Game.floorIndex || 0,
+        Game.floorIndex || 0,
+      );
+      let lx = e.x,
+        ly = e.y;
+      if (
+        (item.rarity === "epic" || item.rarity === "legendary") &&
+        Game.enemies.length > 2 &&
+        GameRNG.random() < 0.5
+      ) {
+        // Риск/награда: спавним эпик/легендарку рядом с группой живых врагов
+        let target =
+          Game.enemies[Math.floor(GameRNG.random() * Game.enemies.length)];
+        if (!target.dead && target !== e) {
+          lx = target.x + (GameRNG.random() - 0.5) * 40;
+          ly = target.y + (GameRNG.random() - 0.5) * 40;
+        }
+      }
+      Game.loot.push({ x: lx, y: ly, type: "item", item: item, r: 10, t: 0 });
+    } else if (GameRNG.random() < 0.25) {
+      Game.loot.push({ x: e.x, y: e.y, type: "hp", r: 8 });
+    }
   }
 
   let aliveEnemies = 0;
@@ -335,21 +386,60 @@ function updateEnemies(Game, sdt) {
     if (e.dead) continue;
     e.flash = Math.max(0, e.flash - sdt * 5);
 
+    const isRider = e.type === "rider_scout" || e.type === "rider_taran";
+
+    // Laughing behavior
+    if (isRider && !e.dead) {
+      if (e.laughTimer === undefined || e.laughTimer === null) {
+        e.laughTimer = 3 + GameRNG.random() * 2;
+      }
+      e.laughTimer -= sdt;
+      if (e.laughTimer <= 0) {
+        e.laughTimer = 3.0 + GameRNG.random() * 2.0;
+        const RIDER_LAUGHS = ["ХА-ХА-ХА!", "НЕ УБЕЖИШЬ!", "ДОГОНЮ!", "КУДА ТЫ?", "ХЕ-ХЕ-ХЕ!"];
+        const phrase = RIDER_LAUGHS[Math.floor(GameRNG.random() * RIDER_LAUGHS.length)];
+        spawnFloatingText(Game, e.x, e.y - 20, phrase, "#ff7700");
+        playRiderLaugh();
+      }
+    }
+
+    // Pushing/Repelling other enemies
+    if (isRider && !e.dead) {
+      for (let j = 0; j < Game.enemies.length; j++) {
+        const other = Game.enemies[j];
+        if (other !== e && !other.dead && other.type !== "rider_scout" && other.type !== "rider_taran" && !other.isBoss) {
+          const dx = other.x - e.x;
+          const dy = other.y - e.y;
+          const dist = Math.hypot(dx, dy);
+          const minDist = e.r + other.r + 8;
+          if (dist < minDist && dist > 0) {
+            const pushForce = (minDist - dist) * 0.6;
+            const px = (dx / dist) * pushForce;
+            const py = (dy / dist) * pushForce;
+            moveWithCollision(Game.map, other, px, py);
+          }
+        }
+      }
+    }
+
     e.offsetUpdateTimer -= sdt;
     if (e.offsetUpdateTimer <= 0) {
       e.targetOffsetX = (GameRNG.random() - 0.5) * 80;
       e.targetOffsetY = (GameRNG.random() - 0.5) * 80;
       e.offsetUpdateTimer = 1.0 + GameRNG.random();
     }
-    const targetX = p.x + e.targetOffsetX;
-    const targetY = p.y + e.targetOffsetY;
+    const targetX = isRider ? p.x : p.x + e.targetOffsetX;
+    const targetY = isRider ? p.y : p.y + e.targetOffsetY;
     let dodgeAng = null;
     if (e.dodgeTimer > 0) {
       e.dodgeTimer -= sdt;
       dodgeAng = e.dodgeAng;
     }
 
-    let ang = Math.atan2(targetY - e.y, targetX - e.x) + (e.jitter || 0) * 0.3;
+    let ang = Math.atan2(targetY - e.y, targetX - e.x);
+    if (!isRider) {
+      ang += (e.jitter || 0) * 0.3;
+    }
     if (dodgeAng !== null) {
       ang = dodgeAng;
     }
@@ -563,7 +653,10 @@ function updateEnemies(Game, sdt) {
       if (e.type === "kamikaze") {
         killEnemy(Game, e);
       } else {
-        const pdmg = 10 * Game.stats.dmgTakenMul;
+        let baseDmg = 10;
+        if (e.type === "rider_taran") baseDmg = 25;
+        else if (e.type === "rider_scout") baseDmg = 12;
+        const pdmg = baseDmg * Game.stats.dmgTakenMul;
         p.hp -= pdmg;
         p.invuln = 1.2; // 1.2 сек бессмертия при ударе
         playSoundHit(false);
