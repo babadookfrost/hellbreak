@@ -610,7 +610,7 @@ const Game={
   },
   draw(){
     ctx.clearRect(0,0,this.effViewW,this.effViewH);
-    if(this.state==='menu'){drawMenu();return;}
+    if(this.state==='menu' || this.state==='operator-select' || this.state==='contracts'){drawMenu();return;}
     ctx.save();
     if(this.scale) ctx.scale(this.scale, this.scale);
     ctx.save();

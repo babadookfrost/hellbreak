@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test": "node --test"
+    "test": "jest"
   },
   "dependencies": {
     "ws": "^8.21.1"
@@ -9,9 +9,6 @@
   "version": "1.0.0",
   "description": "**Кооперативный survival в стиле Vampire Survivors, только сложнее.**",
   "main": "patch_server.js",
-  "scripts": {
-    "test": "jest"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/babadookfrost/hellbreak.git"
