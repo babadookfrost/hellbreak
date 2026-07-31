@@ -1,5 +1,32 @@
 let lootReplaceIndex = -1;
 
+function renderItemSpriteCanvases(container) {
+  const parent = container || document;
+  const canvases = parent.querySelectorAll('.item-sprite-canvas');
+  canvases.forEach(canvas => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (window.tinyDungeonLoaded) {
+      const tileX = parseInt(canvas.getAttribute('data-tile-x'));
+      const tileY = parseInt(canvas.getAttribute('data-tile-y'));
+      const tint = canvas.getAttribute('data-tint');
+      ctx.imageSmoothingEnabled = false;
+      const tile = getCachedTile(tileX, tileY, tint);
+      ctx.drawImage(tile, 0, 0, 16, 16, 0, 0, canvas.width, canvas.height);
+    } else {
+      const fallback = canvas.getAttribute('data-fallback');
+      if (fallback) {
+        ctx.fillStyle = canvas.getAttribute('data-tint') || '#1a1a1a';
+        ctx.font = 'bold ' + Math.round(canvas.height * 0.7) + 'px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(fallback, canvas.width / 2, canvas.height / 2);
+      }
+    }
+  });
+}
+window.renderItemSpriteCanvases = renderItemSpriteCanvases;
+
 function updateLootCompareUI() {
   const slotsContainer = document.getElementById("loot-compare-slots");
   slotsContainer.innerHTML = "";
@@ -11,12 +38,10 @@ function updateLootCompareUI() {
 
   const newItem = Game.pendingLoot;
   document.getElementById("loot-compare-new").style.borderColor = newItem.color;
+  const newTile = getLootTileInfo(newItem.icon);
   document.getElementById("lc-new-icon").innerHTML =
-    '<span style="color:' +
-    newItem.color +
-    '">' +
-    newItem.icon +
-    '</span><div style="font-size:12px; font-weight:bold; color:' +
+    `<div style="display:flex; justify-content:center; align-items:center; height:32px;"><canvas class="item-sprite-canvas" width="32" height="32" data-tile-x="${newTile.col}" data-tile-y="${newTile.row}" data-tint="${newItem.color}" data-fallback="${newItem.icon}" style="image-rendering: pixelated; width:32px; height:32px;"></canvas></div>` +
+    '<div style="font-size:12px; font-weight:bold; color:' +
     newItem.color +
     '">' +
     LOOT_RARITY[newItem.rarity].name +
@@ -37,7 +62,8 @@ function updateLootCompareUI() {
       "; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; color:" +
       item.color +
       "; background:#fff;";
-    slot.innerHTML = item.icon;
+    const tile = getLootTileInfo(item.icon);
+    slot.innerHTML = `<canvas class="item-sprite-canvas" width="28" height="24" data-tile-x="${tile.col}" data-tile-y="${tile.row}" data-tint="${item.color}" data-fallback="${item.icon}" style="image-rendering: pixelated; width:28px; height:24px;"></canvas>`;
 
     slot.onclick = () => {
       lootReplaceIndex = i;
@@ -49,11 +75,8 @@ function updateLootCompareUI() {
       document.getElementById("loot-compare-current").style.borderColor =
         item.color;
       document.getElementById("lc-curr-icon").innerHTML =
-        '<span style="color:' +
-        item.color +
-        '">' +
-        item.icon +
-        '</span><div style="font-size:12px; font-weight:bold; color:' +
+        `<div style="display:flex; justify-content:center; align-items:center; height:32px;"><canvas class="item-sprite-canvas" width="32" height="32" data-tile-x="${tile.col}" data-tile-y="${tile.row}" data-tint="${item.color}" data-fallback="${item.icon}" style="image-rendering: pixelated; width:32px; height:32px;"></canvas></div>` +
+        '<div style="font-size:12px; font-weight:bold; color:' +
         item.color +
         '">' +
         LOOT_RARITY[item.rarity].name +
@@ -65,9 +88,12 @@ function updateLootCompareUI() {
         item.neg.text +
         "</div>";
       document.getElementById("btn-loot-replace").disabled = false;
+      renderItemSpriteCanvases(document.getElementById("loot-compare-current"));
     };
     slotsContainer.appendChild(slot);
   }
+  renderItemSpriteCanvases(slotsContainer);
+  renderItemSpriteCanvases(document.getElementById("loot-compare-new"));
 }
 
 function showInventoryMenu() {
@@ -94,10 +120,11 @@ function showInventoryMenu() {
     el.style.border = `2px solid ${item.color}`;
     el.style.marginBottom = "var(--sp-sm)";
 
+    const tile = getLootTileInfo(item.icon);
     el.innerHTML = `
       <div class="card-content">
         <div class="card-header">
-          <div style="font-size:28px; color:${item.color}; margin-right:var(--sp-sm); display:inline-block; vertical-align:middle;">${item.icon}</div>
+          <div style="width:32px; height:32px; margin-right:var(--sp-sm); display:inline-block; vertical-align:middle; background:rgba(0,0,0,0.1); border-radius:4px;"><canvas class="item-sprite-canvas" width="32" height="32" data-tile-x="${tile.col}" data-tile-y="${tile.row}" data-tint="${item.color}" data-fallback="${item.icon}" style="image-rendering: pixelated; width:32px; height:32px;"></canvas></div>
           <div class="card-title" style="color:${item.color}; display:inline-block; vertical-align:middle;">${LOOT_RARITY[item.rarity].name.toUpperCase()}</div>
         </div>
         <div class="text-body" style="font-weight:bold; color:#10b981;">${item.pos.text}</div>
@@ -106,6 +133,7 @@ function showInventoryMenu() {
     `;
     list.appendChild(el);
   }
+  renderItemSpriteCanvases(list);
 }
 
 const TUTORIAL_PAGES = [
@@ -564,7 +592,7 @@ function drawHud() {
         const pDescEscaped = item.pos.desc.replace(/'/g, "\\'");
         const nDescEscaped = item.neg ? item.neg.desc.replace(/'/g, "\\'") : "";
 
-        // Show tooltip instead of opening the whole inventory directly
+        const tile = getLootTileInfo(item.icon);
         html +=
           '<div style="width:32px; height:32px; border:2px solid ' +
           item.color +
@@ -582,9 +610,16 @@ function drawHud() {
           pDescEscaped +
           "', '" +
           nDescEscaped +
-          "')\">" +
+          "')\"><canvas class=" +
+          '"item-sprite-canvas" width="24" height="24" data-tile-x="' +
+          tile.col +
+          '" data-tile-y="' +
+          tile.row +
+          '" data-tint="' +
+          item.color +
+          '" data-fallback="' +
           item.icon +
-          "</div>";
+          '" style="image-rendering: pixelated; width:24px; height:24px;"></canvas></div>';
       } else {
         html +=
           '<div style="width:32px; height:32px; border:1px solid rgba(26,26,26,0.3); border-radius:4px; background:rgba(0,0,0,0.1); pointer-events:auto; cursor:pointer;" onclick="if(typeof Input !== \'undefined\') Input.wantInventory=true;"></div>';
@@ -593,6 +628,7 @@ function drawHud() {
     if (hudContainer && hudContainer.innerHTML !== html) {
       hudContainer.innerHTML = html;
       hudContainer.style.pointerEvents = "auto";
+      renderItemSpriteCanvases(hudContainer);
     }
   } else if (hudContainer) {
     hudContainer.innerHTML = "";
@@ -636,7 +672,19 @@ function drawHud() {
   ctx.textAlign = "right";
   ctx.fillStyle = p.reloading > 0 ? "#888" : "#1a1a1a";
   const minimapSize = Math.min(140, Game.viewW * 0.2);
-  ctx.fillText(w.icon + " " + as, Game.viewW - minimapSize - 18, 28);
+
+  if (window.tinyDungeonLoaded) {
+    const info = getWeaponTileInfo(p.weaponId);
+    const tileImg = getCachedTile(info.col, info.row, info.tint);
+    const textWidth = ctx.measureText(as).width;
+    const iconSize = fs * 1.5;
+    const iconX = Game.viewW - minimapSize - 18 - textWidth - iconSize - 8;
+    const iconY = 28 - fs * 1.1;
+    ctx.drawImage(tileImg, 0, 0, 16, 16, iconX, iconY, iconSize, iconSize);
+    ctx.fillText(as, Game.viewW - minimapSize - 18, 28);
+  } else {
+    ctx.fillText(w.icon + " " + as, Game.viewW - minimapSize - 18, 28);
+  }
 
   ctx.fillStyle = Game.timeScale <= 0.1 ? "#888" : "#e8a317";
   ctx.fillText(

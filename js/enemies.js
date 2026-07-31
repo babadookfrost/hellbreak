@@ -245,19 +245,6 @@ function killEnemy(Game, e) {
   } else if (GameRNG.random() < 0.25) {
     Game.loot.push({ x: e.x, y: e.y, type: "hp", r: 8 });
   }
-  // 30% шанс выпадания очков мощи
-  else if (GameRNG.random() < 0.3) {
-    const rand = GameRNG.random();
-    const color =
-      rand < 0.05
-        ? "#ff6600"
-        : rand < 0.2
-          ? "#e8a317"
-          : rand < 0.5
-            ? "#0ea5c7"
-            : "#ffffff";
-    Game.loot.push({ x: e.x, y: e.y, type: "weapon", color: color, r: 10 });
-  }
 
   let aliveEnemies = 0;
   for (let i = 0; i < Game.enemies.length; i++) {
