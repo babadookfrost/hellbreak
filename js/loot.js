@@ -311,21 +311,31 @@ function renderUpgradesUI() {
     const canAfford = metaState.shards >= cost && !maxed;
 
     const row = document.createElement("div");
-    row.style.cssText =
-      "display:flex; justify-content:space-between; align-items:center; padding:8px; border:1px solid #ccc; border-radius:6px; background:#faf8f4; margin-bottom: 8px;";
+    row.className =
+      "universal-card " +
+      (maxed ? "owned" : canAfford ? "available" : "unavailable");
+    row.style.marginBottom = "var(--sp-sm)";
 
     row.innerHTML = `
-      <div style="flex:1;">
-        <div style="font-weight:bold; color:var(--bone); font-size:14px;">${u.name} <span style="color:#7a7a7a;">(${lvl}/${u.maxLvl})</span></div>
-        <div style="font-size:11px; color:#7a7a7a;">${u.desc}</div>
+      <div class="card-content">
+        <div class="card-header">
+          <div class="card-title">${u.name} <span class="text-small" style="color:#7a7a7a;">(${lvl}/${u.maxLvl})</span></div>
+        </div>
+        <div class="text-body">${u.desc}</div>
       </div>
-      <button ${canAfford ? "" : "disabled"} style="background:${canAfford ? "var(--ind)" : "#ccc"}; color:${canAfford ? "#1a1a1a" : "#777"}; border:none; padding:8px 12px; font-weight:bold; border-radius:4px; cursor:${canAfford ? "pointer" : "not-allowed"}; font-family:'Courier New',monospace; font-size:12px; margin-left:8px;">
-        ${maxed ? "МАКС" : cost + " ОСК."}
-      </button>
+      ${
+        maxed
+          ? `<div class="card-badge">МАКС</div>`
+          : `
+        <button class="card-action-btn ${canAfford ? "available" : "unavailable"}" ${canAfford ? "" : "disabled"}>
+          ${cost} ОСК.
+        </button>
+      `
+      }
     `;
 
     const btn = row.querySelector("button");
-    if (canAfford) {
+    if (btn && canAfford) {
       btn.onclick = () => {
         metaState.shards -= cost;
         if (u.id === "hp") metaState.hpLvl++;

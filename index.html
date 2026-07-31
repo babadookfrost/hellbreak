@@ -12,6 +12,34 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+
+    <!-- MAIN MENU OVERLAY -->
+    <div id="main-menu" class="main-menu-overlay" style="display: flex;">
+      <div class="main-menu-container">
+        <div class="game-title">М Я С О Р У Б К А</div>
+        <div class="game-subtitle">Двигайся — время идёт. Стой — время замирает.</div>
+
+        <div class="menu-meta-shards" id="menu-shards-display">ОСКОЛКИ: 0</div>
+
+        <div class="start-buttons-block">
+          <button id="btn-menu-start" class="menu-btn-primary">НАЧАТЬ ОБЫЧНЫЙ ЗАБЕГ</button>
+          <button id="btn-menu-daily" class="menu-btn-daily">НАЧАТЬ ДЕЙЛИ-РАН (СИД: --)</button>
+        </div>
+
+        <div class="leaderboard-box">
+          <div class="leaderboard-title">Таблица лидеров</div>
+          <div id="menu-leaderboard-list" style="display: flex; flex-direction: column; gap: var(--sp-sm);">
+            <!-- Dynamic entries -->
+          </div>
+        </div>
+
+        <div class="bottom-buttons-block">
+          <button id="btn-menu-upgrades" class="std-btn">ПРОКАЧКА</button>
+          <button id="btn-menu-settings" class="std-btn secondary">НАСТРОЙКИ</button>
+        </div>
+      </div>
+    </div>
+
     <div class="touch-ui" id="touch-ui">
       <div class="stick-base" id="stick-base">
         <div class="stick-knob" id="stick-knob"></div>
@@ -19,32 +47,7 @@
       <div class="btn btn-dash" id="btn-dash">D</div>
       <div class="btn btn-reload" id="btn-reload">R</div>
       <div class="btn btn-inventory" id="btn-inventory">I</div>
-      <div
-        class="btn btn-pause"
-        id="btn-pause"
-        style="
-          position: fixed;
-          top: max(12px, env(safe-area-inset-top, 12px));
-          right: max(12px, env(safe-area-inset-right, 12px));
-          width: 44px;
-          height: 44px;
-          background: rgba(0, 0, 0, 0.5);
-          color: #fff;
-          border: 2px solid var(--bone);
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 20px;
-          font-weight: bold;
-          font-family: &quot;Courier New&quot;, monospace;
-          z-index: 10;
-          pointer-events: auto;
-          user-select: none;
-        "
-      >
-        ||
-      </div>
+      <div class="btn btn-pause" id="btn-pause">||</div>
     </div>
 
     <div
@@ -91,15 +94,17 @@
           border-radius: 12px;
           max-width: 90vw;
           width: 500px;
+          max-height: 85vh;
           display: flex;
           flex-direction: column;
           gap: 16px;
+          margin: auto;
         "
       >
         <div class="name-entry-title">ВЫБОР ОПЕРАТОРА</div>
 
         <div
-          style="display: flex; flex-direction: column; gap: 12px"
+          style="display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex: 1;"
           id="operators-list"
         >
           <!-- Operators will be populated here -->
@@ -157,9 +162,11 @@
           border-radius: 12px;
           max-width: 90vw;
           width: 500px;
+          max-height: 85vh;
           display: flex;
           flex-direction: column;
           gap: 16px;
+          margin: auto;
         "
       >
         <div class="name-entry-title">ПРОКАЧКА</div>
@@ -175,7 +182,7 @@
         </div>
 
         <div
-          style="display: flex; flex-direction: column; gap: 8px"
+          style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; padding-right: 4px;"
           id="upgrades-list"
         >
           <!-- Upgrades will be populated here -->
