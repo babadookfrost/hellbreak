@@ -256,6 +256,163 @@ function spawnEpicShout(Game) {
   Game.shouts.push({ text, t: 0, duration: 2.5 });
 }
 
+const tinyDungeonImg = typeof Image !== 'undefined' ? new Image() : {};
+if (typeof Image !== 'undefined') {
+  tinyDungeonImg.src = 'assets/sprites/tiny-dungeon.png';
+  window.tinyDungeonImg = tinyDungeonImg;
+  window.tinyDungeonLoaded = false;
+  tinyDungeonImg.onload = () => {
+    window.tinyDungeonLoaded = true;
+  };
+  tinyDungeonImg.onerror = () => {
+    console.error("Failed to load tiny-dungeon sprite-sheet.");
+    window.tinyDungeonLoaded = false;
+  };
+} else {
+  if (typeof window !== 'undefined') window.tinyDungeonLoaded = false;
+}
+
+const tileCache = {};
+window.tileCache = tileCache;
+
+function getCachedTile(tileX, tileY, tintColor) {
+  const key = `${tileX},${tileY},${tintColor || ''}`;
+  if (tileCache[key]) return tileCache[key];
+
+  if (typeof document === 'undefined') return {};
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = 16;
+  offscreen.height = 16;
+  const octx = offscreen.getContext('2d');
+  octx.imageSmoothingEnabled = false;
+
+  // Draw original sprite
+  octx.drawImage(tinyDungeonImg, tileX * 16, tileY * 16, 16, 16, 0, 0, 16, 16);
+
+  if (tintColor) {
+    // Tint using source-in
+    octx.globalCompositeOperation = 'source-in';
+    octx.fillStyle = tintColor;
+    octx.fillRect(0, 0, 16, 16);
+  }
+
+  tileCache[key] = offscreen;
+  return offscreen;
+}
+window.getCachedTile = getCachedTile;
+
+function getCachedOutlinedTile(tileX, tileY, outlineColor) {
+  const key = `outline:${tileX},${tileY},${outlineColor || ''}`;
+  if (tileCache[key]) return tileCache[key];
+
+  if (typeof document === 'undefined') return {};
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width = 18;
+  offscreen.height = 18;
+  const octx = offscreen.getContext('2d');
+  octx.imageSmoothingEnabled = false;
+
+  if (outlineColor) {
+    // Draw silhouette in outlineColor in 4 directions
+    const silhouette = getCachedTile(tileX, tileY, outlineColor);
+    octx.drawImage(silhouette, 0, 1);
+    octx.drawImage(silhouette, 2, 1);
+    octx.drawImage(silhouette, 1, 0);
+    octx.drawImage(silhouette, 1, 2);
+  }
+
+  // Draw the original sprite in the center
+  octx.drawImage(tinyDungeonImg, tileX * 16, tileY * 16, 16, 16, 1, 1, 16, 16);
+
+  tileCache[key] = offscreen;
+  return offscreen;
+}
+window.getCachedOutlinedTile = getCachedOutlinedTile;
+
+function getFloorThemeRow(floorIndex) {
+  const idx = floorIndex % 4;
+  if (idx === 0) return 1; // Floor 1 (ЦЕХ) -> Row 1 (light brown)
+  if (idx === 1) return 0; // Floor 2 (ХОЛОДИЛЬНИК) -> Row 0 (blueish grey)
+  if (idx === 2) return 2; // Floor 3 (КОТЕЛЬНАЯ) -> Row 2 (reddish brown)
+  return 3;                // Floor 4 (ЯДРО) -> Row 3 (dark grey)
+}
+window.getFloorThemeRow = getFloorThemeRow;
+
+function getWallTileCol(map, tx, ty) {
+  const topIsWall = isWallTile(map, tx, ty - 1);
+  const bottomIsWall = isWallTile(map, tx, ty + 1);
+  const leftIsWall = isWallTile(map, tx - 1, ty);
+  const rightIsWall = isWallTile(map, tx + 1, ty);
+
+  // If there is floor below, it's a front-facing wall!
+  if (!bottomIsWall) {
+    return 7; // standard front-facing wall
+  }
+  // If there is floor above, it's the top cap of the wall!
+  if (!topIsWall) {
+    return 5; // standard top wall cap
+  }
+  // Left/Right edges
+  if (!leftIsWall || !rightIsWall) {
+    return 4; // side wall cap / vertical wall
+  }
+
+  // Inner solid wall
+  return 7;
+}
+window.getWallTileCol = getWallTileCol;
+
+function getFloorTileCol(tx, ty) {
+  const h = (tx * 37 + ty * 17) % 100;
+  if (h < 75) return 0;
+  if (h < 85) return 1;
+  if (h < 95) return 2;
+  return 3;
+}
+window.getFloorTileCol = getFloorTileCol;
+
+function getWeaponTileInfo(weaponId) {
+  if (weaponId === "cursed_blade") return { col: 0, row: 8, tint: "#8a2be2" };
+  if (weaponId === "cursed_blade_evo") return { col: 0, row: 8, tint: "#ff00ff" };
+
+  if (weaponId === "necro_crossbow") return { col: 2, row: 8, tint: "#00fa9a" };
+  if (weaponId === "necro_crossbow_evo") return { col: 2, row: 8, tint: "#00fa9a" };
+
+  if (weaponId === "fire_staff") return { col: 4, row: 8, tint: "#ff4400" };
+  if (weaponId === "inferno") return { col: 4, row: 8, tint: "#ff0000" };
+
+  if (weaponId === "ice_wand") return { col: 4, row: 8, tint: "#00ccff" };
+  if (weaponId === "winter_wand") return { col: 4, row: 8, tint: "#00ffff" };
+
+  if (weaponId === "storm_staff") return { col: 4, row: 8, tint: "#ffff00" };
+  if (weaponId === "storm_staff_evo") return { col: 4, row: 8, tint: "#0ea5c7" };
+
+  if (weaponId === "void_shard") return { col: 6, row: 8, tint: "#4b0082" };
+  if (weaponId === "void_shard_evo") return { col: 6, row: 8, tint: "#4b0082" };
+
+  // default / pistol fallback
+  return { col: 4, row: 8, tint: "#ffffff" };
+}
+window.getWeaponTileInfo = getWeaponTileInfo;
+
+function getLootTileInfo(iconChar) {
+  if (iconChar === "◆") return { col: 9, row: 8 }; // Ring
+  if (iconChar === "▲") return { col: 10, row: 8 }; // Meat
+  if (iconChar === "■") return { col: 7, row: 8 }; // Key
+  if (iconChar === "●") return { col: 8, row: 8 }; // Coin
+  if (iconChar === "➤") return { col: 0, row: 8 }; // Sword
+  if (iconChar === "✹") return { col: 2, row: 8 }; // Bow
+  if (iconChar === "★") return { col: 6, row: 8 }; // Scroll
+  if (iconChar === "✚") return { col: 5, row: 8 }; // Potion
+  if (iconChar === "⚡") return { col: 4, row: 8 }; // Wand
+  if (iconChar === "♦") return { col: 11, row: 8 }; // Skull
+
+  return { col: 6, row: 8 }; // default
+}
+window.getLootTileInfo = getLootTileInfo;
+
 loadMeta();
 
 Input.wantWalk = false;
@@ -1444,6 +1601,8 @@ const Game = {
 };
 
 function drawMap(cam, vw, vh) {
+  ctx.imageSmoothingEnabled = false; // Disable smoothing for pixel-perfect render!
+
   const floor = FLOORS[Game.floorIndex % FLOORS.length];
   const p = floor ? floor.palette : {};
   ctx.fillStyle = p.mapBg || "#e8e2d6";
@@ -1454,67 +1613,140 @@ function drawMap(cam, vw, vh) {
   const ty0 = Math.max(0, Math.floor(cam.y / TILE) - 1);
   const tx1 = Math.min(MAP_W, Math.ceil((cam.x + vw) / TILE) + 1);
   const ty1 = Math.min(MAP_H, Math.ceil((cam.y + vh) / TILE) + 1);
-  for (let ty = ty0; ty < ty1; ty++) {
-    for (let tx = tx0; tx < tx1; tx++) {
-      const wall = map.grid[map.idx(tx, ty)] === 1;
-      const x = tx * TILE,
-        y = ty * TILE;
-      if (wall) {
-        ctx.fillStyle =
-          (tx + ty) % 2 === 0
-            ? p.mapWall1 || "#c4b8a8"
-            : p.mapWall2 || "#b8aa98";
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.strokeStyle = p.mapStroke || "rgba(100,80,60,0.25)";
-        ctx.strokeRect(x + 1, y + 1, TILE - 2, TILE - 2);
-      } else {
-        ctx.fillStyle =
-          (tx + ty) % 2 === 0
-            ? p.mapFloor1 || "#f0ebe0"
-            : p.mapFloor2 || "#ebe5d8";
-        ctx.fillRect(x, y, TILE, TILE);
+
+  if (window.tinyDungeonLoaded) {
+    for (let ty = ty0; ty < ty1; ty++) {
+      for (let tx = tx0; tx < tx1; tx++) {
+        const wall = map.grid[map.idx(tx, ty)] === 1;
+        const x = tx * TILE,
+          y = ty * TILE;
+        if (wall) {
+          const isEdge = tx === 0 || ty === 0 || tx === MAP_W - 1 || ty === MAP_H - 1;
+          const row = getFloorThemeRow(Game.floorIndex);
+          const col = isEdge ? getWallTileCol(map, tx, ty) : 8; // Column 8 for internal tactical pillars!
+          ctx.drawImage(tinyDungeonImg, col * 16, row * 16, 16, 16, x, y, TILE, TILE);
+        } else {
+          const col = getFloorTileCol(tx, ty);
+          const row = getFloorThemeRow(Game.floorIndex);
+          ctx.drawImage(tinyDungeonImg, col * 16, row * 16, 16, 16, x, y, TILE, TILE);
+        }
+      }
+    }
+  } else {
+    for (let ty = ty0; ty < ty1; ty++) {
+      for (let tx = tx0; tx < tx1; tx++) {
+        const wall = map.grid[map.idx(tx, ty)] === 1;
+        const x = tx * TILE,
+          y = ty * TILE;
+        if (wall) {
+          ctx.fillStyle =
+            (tx + ty) % 2 === 0
+              ? p.mapWall1 || "#c4b8a8"
+              : p.mapWall2 || "#b8aa98";
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.strokeStyle = p.mapStroke || "rgba(100,80,60,0.25)";
+          ctx.strokeRect(x + 1, y + 1, TILE - 2, TILE - 2);
+        } else {
+          ctx.fillStyle =
+            (tx + ty) % 2 === 0
+              ? p.mapFloor1 || "#f0ebe0"
+              : p.mapFloor2 || "#ebe5d8";
+          ctx.fillRect(x, y, TILE, TILE);
+        }
       }
     }
   }
 }
 
+function getEnemyTileCoords(e) {
+  if (e.isHeart) return { x: 10, y: 9 };
+  if (e.bossType === 'boss2') return { x: 4, y: 9 };
+  if (e.isBoss) return { x: 2, y: 9 }; // boss1
+
+  if (e.type === 'melee') return { x: 0, y: 6 };
+  if (e.type === 'shooter') return { x: 1, y: 6 };
+  if (e.type === 'tank') return { x: 9, y: 6 };
+  if (e.type === 'kamikaze') return { x: 2, y: 6 };
+  if (e.type === 'sniper') return { x: 7, y: 6 };
+
+  return { x: 0, y: 6 }; // default fallback
+}
+
+function getPlayerTileCoords(p) {
+  const id = p.op ? p.op.id : 'recruit';
+  if (id === 'juggernaut') return { x: 0, y: 7 };
+  if (id === 'phantom') return { x: 4, y: 7 };
+  return { x: 1, y: 7 }; // recruit
+}
+
 function drawWorldEntities() {
+  ctx.imageSmoothingEnabled = false; // Ensure smoothing is false in drawing entities too!
+
   // 1. Отрисовка выпавшего лута
   if (Game.loot) {
     for (let i = 0; i < Game.loot.length; i++) {
       let l = Game.loot[i];
-      ctx.shadowBlur = 12;
-      if (l.type === "hp") {
-        ctx.shadowColor = "#d92638";
-        ctx.fillStyle = "#d92638";
-        ctx.beginPath();
-        ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(l.x - 2, l.y - l.r + 2, 4, l.r * 2 - 4);
-        ctx.fillRect(l.x - l.r + 2, l.y - 2, l.r * 2 - 4, 4);
-      } else if (l.type === "item") {
-        l.t = (l.t || 0) + 1 / 60;
-        ctx.shadowColor = l.item.color;
-        ctx.shadowBlur =
-          l.item.rarity === "legendary" ? 15 + Math.sin(l.t * 5) * 5 : 10;
-        ctx.fillStyle = l.item.color;
-        ctx.font = "bold 16px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(l.item.icon, l.x, l.y + 6);
-        ctx.strokeStyle = l.item.color;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(
-          l.x,
-          l.y,
-          l.r + (l.item.rarity === "legendary" ? Math.sin(l.t * 10) * 2 : 0),
-          0,
-          Math.PI * 2,
-        );
-        ctx.stroke();
+      if (window.tinyDungeonLoaded) {
+        if (l.type === "hp") {
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = "#d92638";
+          const size = l.r * 2.5;
+          ctx.drawImage(tinyDungeonImg, 5 * 16, 8 * 16, 16, 16, l.x - size / 2, l.y - size / 2, size, size);
+        } else if (l.type === "item") {
+          l.t = (l.t || 0) + 1 / 60;
+          ctx.shadowColor = l.item.color;
+          ctx.shadowBlur = l.item.rarity === "legendary" ? 15 + Math.sin(l.t * 5) * 5 : 10;
+          const size = l.r * 2.5;
+          ctx.drawImage(tinyDungeonImg, 5 * 16, 7 * 16, 16, 16, l.x - size / 2, l.y - size / 2, size, size);
+
+          // Keep the rarity circle border overlay for style and extra clarity as asked!
+          ctx.strokeStyle = l.item.color;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(
+            l.x,
+            l.y,
+            l.r + (l.item.rarity === "legendary" ? Math.sin(l.t * 10) * 2 : 0),
+            0,
+            Math.PI * 2,
+          );
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.shadowBlur = 12;
+        if (l.type === "hp") {
+          ctx.shadowColor = "#d92638";
+          ctx.fillStyle = "#d92638";
+          ctx.beginPath();
+          ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(l.x - 2, l.y - l.r + 2, 4, l.r * 2 - 4);
+          ctx.fillRect(l.x - l.r + 2, l.y - 2, l.r * 2 - 4, 4);
+        } else if (l.type === "item") {
+          l.t = (l.t || 0) + 1 / 60;
+          ctx.shadowColor = l.item.color;
+          ctx.shadowBlur =
+            l.item.rarity === "legendary" ? 15 + Math.sin(l.t * 5) * 5 : 10;
+          ctx.fillStyle = l.item.color;
+          ctx.font = "bold 16px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(l.item.icon, l.x, l.y + 6);
+          ctx.strokeStyle = l.item.color;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(
+            l.x,
+            l.y,
+            l.r + (l.item.rarity === "legendary" ? Math.sin(l.t * 10) * 2 : 0),
+            0,
+            Math.PI * 2,
+          );
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
       }
-      ctx.shadowBlur = 0;
     }
   }
 
@@ -1679,75 +1911,84 @@ function drawWorldEntities() {
       ctx.fill();
     }
     ctx.shadowBlur = 0;
-    ctx.fillStyle = e.flash > 0 ? "#fff" : bc;
-    ctx.strokeStyle = e.flash > 0 ? "#fff" : "#1a1a1a";
-    ctx.lineWidth = e.isBoss ? 4 : 2;
 
-    // Draw body shapes
-    ctx.beginPath();
-    if (e.bossType === "boss2") {
-      // Hexagon for boss2
-      for (let j = 0; j < 6; j++) {
-        ctx.lineTo(
-          Math.cos((j * Math.PI) / 3) * e.r,
-          Math.sin((j * Math.PI) / 3) * e.r,
-        );
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      // Inner detail
-      ctx.fillStyle = "#1a1a1a";
-      ctx.beginPath();
-      for (let j = 0; j < 3; j++) {
-        ctx.lineTo(
-          Math.cos((j * 2 * Math.PI) / 3) * e.r * 0.5,
-          Math.sin((j * 2 * Math.PI) / 3) * e.r * 0.5,
-        );
-      }
-      ctx.closePath();
-      ctx.fill();
-    } else if (e.type === "kamikaze") {
-      // Triangle pointing forward
-      ctx.moveTo(e.r, 0);
-      ctx.lineTo(-e.r * 0.5, e.r * 0.8);
-      ctx.lineTo(-e.r * 0.5, -e.r * 0.8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(-e.r * 0.2, -4, e.r * 0.5, 8); // eye
-    } else if (e.type === "tank") {
-      // Square
-      ctx.rect(-e.r, -e.r, e.r * 2, e.r * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(e.r * 0.2, -6, 8, 12); // eye
-    } else if (e.isHeart) {
-      ctx.arc(0, 0, e.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      ctx.arc(
-        0,
-        0,
-        e.r * 0.3 * (1 + Math.sin(Date.now() / 200) * 0.5),
-        0,
-        Math.PI * 2,
-      );
-      ctx.fill();
+    if (window.tinyDungeonLoaded) {
+      const coords = getEnemyTileCoords(e);
+      const outlineColor = e.flash > 0 ? "#ffffff" : bc;
+      const outlinedTile = getCachedOutlinedTile(coords.x, coords.y, outlineColor);
+      const size = e.r * 2 * (18 / 16);
+      ctx.drawImage(outlinedTile, -size / 2, -size / 2, size, size);
     } else {
-      ctx.arc(0, 0, e.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (e.type === "shooter" || e.type === "sniper") {
-        // Gun barrel + eye
-        ctx.fillStyle = e.flash > 0 ? "#fff" : "#1a1a1a";
-        ctx.fillRect(e.r * 0.5, -4, e.r, 8);
+      ctx.fillStyle = e.flash > 0 ? "#fff" : bc;
+      ctx.strokeStyle = e.flash > 0 ? "#fff" : "#1a1a1a";
+      ctx.lineWidth = e.isBoss ? 4 : 2;
+
+      // Draw body shapes
+      ctx.beginPath();
+      if (e.bossType === "boss2") {
+        // Hexagon for boss2
+        for (let j = 0; j < 6; j++) {
+          ctx.lineTo(
+            Math.cos((j * Math.PI) / 3) * e.r,
+            Math.sin((j * Math.PI) / 3) * e.r,
+          );
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // Inner detail
+        ctx.fillStyle = "#1a1a1a";
+        ctx.beginPath();
+        for (let j = 0; j < 3; j++) {
+          ctx.lineTo(
+            Math.cos((j * 2 * Math.PI) / 3) * e.r * 0.5,
+            Math.sin((j * 2 * Math.PI) / 3) * e.r * 0.5,
+          );
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else if (e.type === "kamikaze") {
+        // Triangle pointing forward
+        ctx.moveTo(e.r, 0);
+        ctx.lineTo(-e.r * 0.5, e.r * 0.8);
+        ctx.lineTo(-e.r * 0.5, -e.r * 0.8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
         ctx.fillStyle = "#fff";
-        ctx.fillRect(e.r * 0.2, -4, 6, 6);
+        ctx.fillRect(-e.r * 0.2, -4, e.r * 0.5, 8); // eye
+      } else if (e.type === "tank") {
+        // Square
+        ctx.rect(-e.r, -e.r, e.r * 2, e.r * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(e.r * 0.2, -6, 8, 12); // eye
+      } else if (e.isHeart) {
+        ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(
+          0,
+          0,
+          e.r * 0.3 * (1 + Math.sin(Date.now() / 200) * 0.5),
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+      } else {
+        ctx.arc(0, 0, e.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (e.type === "shooter" || e.type === "sniper") {
+          // Gun barrel + eye
+          ctx.fillStyle = e.flash > 0 ? "#fff" : "#1a1a1a";
+          ctx.fillRect(e.r * 0.5, -4, e.r, 8);
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(e.r * 0.2, -4, 6, 6);
+        }
       }
     }
     ctx.restore();
@@ -1818,33 +2059,44 @@ function drawWorldEntities() {
   ctx.translate(p.x, p.y);
   ctx.rotate(pRot);
 
-  // Body
-  ctx.beginPath();
-  if (p.op && p.op.id === "juggernaut") {
-    // Bulky square-ish
-    ctx.rect(-p.r * 0.9, -p.r * 0.9, p.r * 1.8, p.r * 1.8);
-  } else if (p.op && p.op.id === "phantom") {
-    // Sharp triangle
-    ctx.moveTo(p.r * 1.2, 0);
-    ctx.lineTo(-p.r * 0.8, p.r * 0.8);
-    ctx.lineTo(-p.r * 0.8, -p.r * 0.8);
+  if (window.tinyDungeonLoaded) {
+    const coords = getPlayerTileCoords(p);
+    let outlineColor = visorColor;
+    if (p.dashT > 0 || p.invuln > 0) {
+      outlineColor = "#0ea5c7"; // Cyan during dash/invuln
+    }
+    const outlinedTile = getCachedOutlinedTile(coords.x, coords.y, outlineColor);
+    const size = p.r * 2 * (18 / 16);
+    ctx.drawImage(outlinedTile, -size / 2, -size / 2, size, size);
   } else {
-    // Default Diamond
-    ctx.moveTo(p.r, 0);
-    ctx.lineTo(0, p.r * 0.8);
-    ctx.lineTo(-p.r * 0.8, 0);
-    ctx.lineTo(0, -p.r * 0.8);
+    // Body
+    ctx.beginPath();
+    if (p.op && p.op.id === "juggernaut") {
+      // Bulky square-ish
+      ctx.rect(-p.r * 0.9, -p.r * 0.9, p.r * 1.8, p.r * 1.8);
+    } else if (p.op && p.op.id === "phantom") {
+      // Sharp triangle
+      ctx.moveTo(p.r * 1.2, 0);
+      ctx.lineTo(-p.r * 0.8, p.r * 0.8);
+      ctx.lineTo(-p.r * 0.8, -p.r * 0.8);
+    } else {
+      // Default Diamond
+      ctx.moveTo(p.r, 0);
+      ctx.lineTo(0, p.r * 0.8);
+      ctx.lineTo(-p.r * 0.8, 0);
+      ctx.lineTo(0, -p.r * 0.8);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye / Visor
+    ctx.fillStyle = visorColor;
+    ctx.fillRect(p.r * 0.2, -4, p.r * 0.5, 8);
+
+    // Hand/Gun stub
+    ctx.fillStyle = "#444";
+    ctx.fillRect(p.r * 0.5, 4, p.r * 0.8, 4);
   }
-  ctx.closePath();
-  ctx.fill();
-
-  // Eye / Visor
-  ctx.fillStyle = visorColor;
-  ctx.fillRect(p.r * 0.2, -4, p.r * 0.5, 8);
-
-  // Hand/Gun stub
-  ctx.fillStyle = "#444";
-  ctx.fillRect(p.r * 0.5, 4, p.r * 0.8, 4);
 
   ctx.restore();
   ctx.shadowBlur = 0;
