@@ -1,166 +1,861 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#f5f0e8">
-<title>Мясорубка</title>
-<link rel="stylesheet" href="css/style.css">
-
-</head>
-<body>
-<canvas id="game"></canvas>
-<div class="touch-ui" id="touch-ui">
-<div class="stick-base" id="stick-base"><div class="stick-knob" id="stick-knob"></div></div>
-<div class="btn btn-dash" id="btn-dash">D</div>
-<div class="btn btn-reload" id="btn-reload">R</div>
-<div class="btn btn-inventory" id="btn-inventory">I</div>
-</div>
-
-<div id="hud-inventory" style="position:fixed; top:max(40px, env(safe-area-inset-top, 14px)); left:max(12px, env(safe-area-inset-left, 12px)); display:flex; gap:6px; pointer-events:none; z-index:5;">
-</div>
-
-<div class="desktop-hints">WASD — движение · Мышь — прицел · ЛКМ — стрельба · R — перезарядка · SHIFT — рывок</div>
-<div class="name-entry" id="name-entry">
-<form id="name-form">
-<div class="name-entry-title">НОВЫЙ РЕКОРД!</div>
-<input id="name-input" maxlength="12" autocomplete="off" placeholder="ТВОЁ ИМЯ" inputmode="text" enterkeyhint="done"/>
-<button type="submit">OK</button>
-</form>
-</div>
-
-<div class="name-entry" id="operator-select-menu" style="display:none; flex-direction:column; z-index:20;">
-  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:500px; display:flex; flex-direction:column; gap:16px;">
-    <div class="name-entry-title">ВЫБОР ОПЕРАТОРА</div>
-
-    <div style="display:flex; flex-direction:column; gap:12px;" id="operators-list">
-      <!-- Operators will be populated here -->
-    </div>
-
-    <div style="display:flex; gap:12px; margin-top:8px;">
-      <button id="btn-op-close" style="flex:1; background:#ccc; color:#333; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px;">НАЗАД</button>
-      <button id="btn-op-start" style="flex:2; background:var(--ind); color:#1a1a1a; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px;">В БОЙ</button>
-    </div>
-  </div>
-</div>
-
-<div class="name-entry" id="upgrades-menu" style="display:none; flex-direction:column;">
-  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:500px; display:flex; flex-direction:column; gap:16px;">
-    <div class="name-entry-title">ПРОКАЧКА</div>
-    <div style="text-align:center; font-size:18px; color:var(--ind); font-weight:bold;">ОСКОЛКИ: <span id="upgrade-shards-count">0</span></div>
-
-    <div style="display:flex; flex-direction:column; gap:8px;" id="upgrades-list">
-      <!-- Upgrades will be populated here -->
-    </div>
-
-    <button id="btn-upgrades-close" style="background:var(--bone); color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px; margin-top: 8px;">ЗАКРЫТЬ</button>
-  </div>
-</div>
-
-<div class="name-entry" id="inventory-menu" style="display:none; flex-direction:column;">
-  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:600px; display:flex; flex-direction:column; gap:16px;">
-    <div class="name-entry-title">ИНВЕНТАРЬ</div>
-    <div style="text-align:center; font-size:14px; color:#555;">Текущие предметы и их эффекты</div>
-    <div id="inventory-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-    <button id="btn-inventory-close" style="background:var(--bone); color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px; margin-top: 8px;">ЗАКРЫТЬ</button>
-  </div>
-</div>
-
-<div class="name-entry" id="loot-compare" style="display:none; flex-direction:column;">
-  <div style="background:#fff; border:2px solid var(--ind); padding:20px; border-radius:12px; max-width:90vw; width:450px; display:flex; flex-direction:column; gap:16px;">
-    <div class="name-entry-title">ИНВЕНТАРЬ ПОЛОН</div>
-    <div style="font-size:14px; text-align:center; color:#555;">Выберите предмет для замены</div>
-    <div id="loot-compare-slots" style="display:flex; justify-content:space-between; gap:8px;"></div>
-
-    <div style="display:flex; gap:16px; margin-top:10px;">
-      <div id="loot-compare-current" style="flex:1; border:1px solid #ccc; border-radius:6px; padding:12px; text-align:center;">
-        <div style="font-size:12px; color:#777; margin-bottom:8px;">ТЕКУЩИЙ</div>
-        <div id="lc-curr-icon" style="font-size:24px; margin-bottom:4px;"></div>
-        <div id="lc-curr-stats" style="font-size:12px; text-align:left;"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#f5f0e8" />
+    <title>Мясорубка</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div class="touch-ui" id="touch-ui">
+      <div class="stick-base" id="stick-base">
+        <div class="stick-knob" id="stick-knob"></div>
       </div>
-
-      <div id="loot-compare-new" style="flex:1; border:2px solid var(--ind); border-radius:6px; padding:12px; text-align:center; background:#faf8f4;">
-        <div style="font-size:12px; color:var(--ind); margin-bottom:8px; font-weight:bold;">НОВЫЙ</div>
-        <div id="lc-new-icon" style="font-size:24px; margin-bottom:4px;"></div>
-        <div id="lc-new-stats" style="font-size:12px; text-align:left;"></div>
+      <div class="btn btn-dash" id="btn-dash">D</div>
+      <div class="btn btn-reload" id="btn-reload">R</div>
+      <div class="btn btn-inventory" id="btn-inventory">I</div>
+      <div
+        class="btn btn-pause"
+        id="btn-pause"
+        style="
+          position: fixed;
+          top: max(12px, env(safe-area-inset-top, 12px));
+          right: max(12px, env(safe-area-inset-right, 12px));
+          width: 44px;
+          height: 44px;
+          background: rgba(0, 0, 0, 0.5);
+          color: #fff;
+          border: 2px solid var(--bone);
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          font-weight: bold;
+          font-family: &quot;Courier New&quot;, monospace;
+          z-index: 10;
+          pointer-events: auto;
+          user-select: none;
+        "
+      >
+        ||
       </div>
     </div>
 
-    <div style="display:flex; gap:12px; margin-top:10px;">
-      <button id="btn-loot-skip" style="flex:1; background:#999; color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;">ПРОПУСТИТЬ</button>
-      <button id="btn-loot-replace" style="flex:1; background:var(--ind); color:#1a1a1a; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;" disabled>ЗАМЕНИТЬ</button>
+    <div
+      id="hud-inventory"
+      style="
+        position: fixed;
+        top: max(40px, env(safe-area-inset-top, 14px));
+        left: max(12px, env(safe-area-inset-left, 12px));
+        display: flex;
+        gap: 6px;
+        pointer-events: none;
+        z-index: 5;
+      "
+    ></div>
+    <div class="desktop-hints">
+      WASD — движение · Мышь — прицел · ЛКМ — стрельба · R — перезарядка · SHIFT
+      — рывок
     </div>
-  </div>
-</div>
-
-<script src="js/settings.js"></script>
-<script src="js/operators.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/daily.js"></script>
-<script src="js/input.js"></script>
-<script src="js/floors.js"></script>
-<script src="js/weapons.js"></script>
-<script src="js/enemies.js"></script>
-<script src="js/loot.js"></script>
-<script src="js/contracts.js"></script>
-<script src="js/radio.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/game.js"></script>
-
-<div class="name-entry" id="settings-menu" style="display:none; flex-direction:column;">
-  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:500px; display:flex; flex-direction:column; gap:16px;">
-    <div class="name-entry-title">НАСТРОЙКИ</div>
-
-    <label style="display:flex; justify-content:space-between; align-items:center; font-weight:bold; color:#1a1a1a;">
-      Зум:
-      <input type="range" id="set-zoom" min="0.7" max="1.3" step="0.1" style="width: 200px;">
-    </label>
-
-    <label style="display:flex; justify-content:space-between; align-items:center; font-weight:bold; color:#1a1a1a;">
-      FPS:
-      <select id="set-fps" style="padding: 6px; font-family:'Courier New',monospace; background:#faf8f4; border:1px solid #ccc; border-radius:4px; width: 200px;">
-        <option value="0">Без ограничения</option>
-        <option value="60">60</option>
-        <option value="30">30</option>
-      </select>
-    </label>
-
-    <label style="display:flex; justify-content:space-between; align-items:center; font-weight:bold; color:#1a1a1a;">
-      Графика:
-      <select id="set-gfx" style="padding: 6px; font-family:'Courier New',monospace; background:#faf8f4; border:1px solid #ccc; border-radius:4px; width: 200px;">
-        <option value="high">Высокое</option>
-        <option value="mid">Среднее</option>
-        <option value="low">Низкое</option>
-      </select>
-    </label>
-
-    <button id="btn-settings-close" style="background:var(--bone); color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-family:'Courier New',monospace; font-size:16px; margin-top: 8px;">ЗАКРЫТЬ</button>
-  </div>
-</div>
-
-<div class="name-entry" id="contracts-menu" style="display:none; flex-direction:column;">
-  <div style="background:#fff; border:2px solid var(--ind); padding:24px; border-radius:12px; max-width:90vw; width:600px; display:flex; flex-direction:column; gap:16px;">
-    <div class="name-entry-title">КОНТРАКТЫ НА ЗАБЕГ</div>
-    <div style="text-align:center; font-size:14px; color:#555;">Выберите 2 контракта. Выполненные контракты дают +15% осколков каждый.</div>
-    <div id="contracts-list" style="display:flex; flex-direction:column; gap:12px;"></div>
-    <div style="display:flex; justify-content:space-between; margin-top:8px;">
-      <button id="btn-contracts-cancel" style="flex:0.4; background:#999; color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;">ОТМЕНА</button>
-      <button id="btn-contracts-start" style="flex:0.55; background:var(--ind); color:#1a1a1a; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer;" disabled>НАЧАТЬ (Выбрано 0/2)</button>
+    <div class="name-entry" id="name-entry">
+      <form id="name-form">
+        <div class="name-entry-title">НОВЫЙ РЕКОРД!</div>
+        <input
+          id="name-input"
+          maxlength="12"
+          autocomplete="off"
+          placeholder="ТВОЁ ИМЯ"
+          inputmode="text"
+          enterkeyhint="done"
+        />
+        <button type="submit">OK</button>
+      </form>
     </div>
-  </div>
-</div>
 
-<div class="name-entry" id="portal-ui" style="display:none; flex-direction:column; background:rgba(26,26,26,0.7);">
-  <div style="background:#fff; border:2px solid var(--cyan); padding:24px; border-radius:12px; max-width:90vw; width:400px; display:flex; flex-direction:column; gap:16px;">
-    <div class="name-entry-title" style="color:var(--cyan);">ПОРТАЛ</div>
-    <div style="text-align:center; font-size:14px; color:#555;">Твоя мясорубка может закончиться здесь.</div>
-    <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
-      <button id="btn-portal-descend" style="background:var(--cyan); color:#1a1a1a; border:none; padding:14px; font-weight:bold; border-radius:6px; cursor:pointer; font-size:16px;">СПУСТИТЬСЯ (СЛЕД. ЭТАЖ)</button>
-      <button id="btn-portal-evac" style="background:var(--ind); color:#1a1a1a; border:none; padding:14px; font-weight:bold; border-radius:6px; cursor:pointer; font-size:16px;">ЭВАКУАЦИЯ (+30% ОСКОЛКОВ)</button>
-      <button id="btn-portal-cancel" style="background:#999; color:#fff; border:none; padding:12px; font-weight:bold; border-radius:6px; cursor:pointer; font-size:14px; margin-top:8px;">ОТМЕНА</button>
+    <div
+      class="name-entry"
+      id="operator-select-menu"
+      style="display: none; flex-direction: column; z-index: 20"
+    >
+      <div
+        style="
+          background: #fff;
+          border: 2px solid var(--ind);
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 500px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        "
+      >
+        <div class="name-entry-title">ВЫБОР ОПЕРАТОРА</div>
+
+        <div
+          style="display: flex; flex-direction: column; gap: 12px"
+          id="operators-list"
+        >
+          <!-- Operators will be populated here -->
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 8px">
+          <button
+            id="btn-op-close"
+            style="
+              flex: 1;
+              background: #ccc;
+              color: #333;
+              border: none;
+              padding: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+              font-family: &quot;Courier New&quot;, monospace;
+              font-size: 16px;
+            "
+          >
+            НАЗАД
+          </button>
+          <button
+            id="btn-op-start"
+            style="
+              flex: 2;
+              background: var(--ind);
+              color: #1a1a1a;
+              border: none;
+              padding: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+              font-family: &quot;Courier New&quot;, monospace;
+              font-size: 16px;
+            "
+          >
+            В БОЙ
+          </button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-</body>
+    <div
+      class="name-entry"
+      id="upgrades-menu"
+      style="display: none; flex-direction: column"
+    >
+      <div
+        style="
+          background: #fff;
+          border: 2px solid var(--ind);
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 500px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        "
+      >
+        <div class="name-entry-title">ПРОКАЧКА</div>
+        <div
+          style="
+            text-align: center;
+            font-size: 18px;
+            color: var(--ind);
+            font-weight: bold;
+          "
+        >
+          ОСКОЛКИ: <span id="upgrade-shards-count">0</span>
+        </div>
+
+        <div
+          style="display: flex; flex-direction: column; gap: 8px"
+          id="upgrades-list"
+        >
+          <!-- Upgrades will be populated here -->
+        </div>
+
+        <button
+          id="btn-upgrades-close"
+          style="
+            background: var(--bone);
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: &quot;Courier New&quot;, monospace;
+            font-size: 16px;
+            margin-top: 8px;
+          "
+        >
+          ЗАКРЫТЬ
+        </button>
+      </div>
+    </div>
+
+    <div
+      class="name-entry"
+      id="inventory-menu"
+      style="display: none; flex-direction: column"
+    >
+      <div
+        style="
+          background: #fff;
+          border: 2px solid var(--ind);
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 600px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        "
+      >
+        <div class="name-entry-title">ИНВЕНТАРЬ</div>
+        <div style="text-align: center; font-size: 14px; color: #555">
+          Текущие предметы и их эффекты
+        </div>
+        <div
+          id="inventory-list"
+          style="display: flex; flex-direction: column; gap: 8px"
+        ></div>
+        <button
+          id="btn-inventory-close"
+          style="
+            background: var(--bone);
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: &quot;Courier New&quot;, monospace;
+            font-size: 16px;
+            margin-top: 8px;
+          "
+        >
+          ЗАКРЫТЬ
+        </button>
+      </div>
+    </div>
+
+    <div
+      class="name-entry"
+      id="loot-compare"
+      style="display: none; flex-direction: column"
+    >
+      <div
+        style="
+          background: #fff;
+          border: 2px solid var(--ind);
+          padding: 20px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 450px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        "
+      >
+        <div class="name-entry-title">ИНВЕНТАРЬ ПОЛОН</div>
+        <div style="font-size: 14px; text-align: center; color: #555">
+          Выберите предмет для замены
+        </div>
+        <div
+          id="loot-compare-slots"
+          style="display: flex; justify-content: space-between; gap: 8px"
+        ></div>
+
+        <div style="display: flex; gap: 16px; margin-top: 10px">
+          <div
+            id="loot-compare-current"
+            style="
+              flex: 1;
+              border: 1px solid #ccc;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+            "
+          >
+            <div style="font-size: 12px; color: #777; margin-bottom: 8px">
+              ТЕКУЩИЙ
+            </div>
+            <div
+              id="lc-curr-icon"
+              style="font-size: 24px; margin-bottom: 4px"
+            ></div>
+            <div
+              id="lc-curr-stats"
+              style="font-size: 12px; text-align: left"
+            ></div>
+          </div>
+
+          <div
+            id="loot-compare-new"
+            style="
+              flex: 1;
+              border: 2px solid var(--ind);
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              background: #faf8f4;
+            "
+          >
+            <div
+              style="
+                font-size: 12px;
+                color: var(--ind);
+                margin-bottom: 8px;
+                font-weight: bold;
+              "
+            >
+              НОВЫЙ
+            </div>
+            <div
+              id="lc-new-icon"
+              style="font-size: 24px; margin-bottom: 4px"
+            ></div>
+            <div
+              id="lc-new-stats"
+              style="font-size: 12px; text-align: left"
+            ></div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 10px">
+          <button
+            id="btn-loot-skip"
+            style="
+              flex: 1;
+              background: #999;
+              color: #fff;
+              border: none;
+              padding: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+          >
+            ПРОПУСТИТЬ
+          </button>
+          <button
+            id="btn-loot-replace"
+            style="
+              flex: 1;
+              background: var(--ind);
+              color: #1a1a1a;
+              border: none;
+              padding: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+            disabled
+          >
+            ЗАМЕНИТЬ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/settings.js"></script>
+    <script src="js/operators.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/daily.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/floors.js"></script>
+    <script src="js/weapons.js"></script>
+    <script src="js/enemies.js"></script>
+    <script src="js/loot.js"></script>
+    <script src="js/contracts.js"></script>
+    <script src="js/radio.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+
+    <div
+      class="name-entry"
+      id="settings-menu"
+      style="display: none; flex-direction: column"
+    >
+      <div
+        style="
+          background: #fff;
+          border: 2px solid var(--ind);
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 500px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        "
+      >
+        <div class="name-entry-title">НАСТРОЙКИ</div>
+
+        <label
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: #1a1a1a;
+          "
+        >
+          Зум:
+          <input
+            type="range"
+            id="set-zoom"
+            min="0.7"
+            max="1.3"
+            step="0.1"
+            style="width: 200px"
+          />
+        </label>
+
+        <label
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: #1a1a1a;
+          "
+        >
+          FPS:
+          <select
+            id="set-fps"
+            style="
+              padding: 6px;
+              font-family: &quot;Courier New&quot;, monospace;
+              background: #faf8f4;
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              width: 200px;
+            "
+          >
+            <option value="0">Без ограничения</option>
+            <option value="60">60</option>
+            <option value="30">30</option>
+          </select>
+        </label>
+
+        <label
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: #1a1a1a;
+          "
+        >
+          Графика:
+          <select
+            id="set-gfx"
+            style="
+              padding: 6px;
+              font-family: &quot;Courier New&quot;, monospace;
+              background: #faf8f4;
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              width: 200px;
+            "
+          >
+            <option value="high">Высокое</option>
+            <option value="mid">Среднее</option>
+            <option value="low">Низкое</option>
+          </select>
+        </label>
+
+        <label
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: #1a1a1a;
+          "
+        >
+          Музыка:
+          <input
+            type="range"
+            id="set-music-vol"
+            min="0"
+            max="1"
+            step="0.1"
+            value="0.5"
+            style="width: 200px; accent-color: var(--ind)"
+          />
+        </label>
+
+        <label
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: #1a1a1a;
+          "
+        >
+          Звуки:
+          <input
+            type="range"
+            id="set-sfx-vol"
+            min="0"
+            max="1"
+            step="0.1"
+            value="0.5"
+            style="width: 200px; accent-color: var(--ind)"
+          />
+        </label>
+
+        <button
+          id="btn-settings-tutorial"
+          style="
+            background: var(--cyan);
+            color: #1a1a1a;
+            border: none;
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: &quot;Courier New&quot;, monospace;
+            font-size: 16px;
+            margin-top: 8px;
+          "
+        >
+          КАК ИГРАТЬ
+        </button>
+        <button
+          id="btn-settings-close"
+          style="
+            background: var(--bone);
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: &quot;Courier New&quot;, monospace;
+            font-size: 16px;
+            margin-top: 8px;
+          "
+        >
+          ЗАКРЫТЬ
+        </button>
+        <button
+          id="btn-settings-surrender"
+          style="
+            display: none;
+            background: #d92638;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: &quot;Courier New&quot;, monospace;
+            font-size: 16px;
+            margin-top: 8px;
+          "
+        >
+          СДАТЬСЯ
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="item-tooltip"
+      style="
+        display: none;
+        position: fixed;
+        z-index: 20;
+        background: #1a1a1a;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        padding: 12px;
+        width: 220px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        pointer-events: auto;
+      "
+      onclick="this.style.display = 'none'"
+    >
+      <div
+        id="item-tooltip-name"
+        style="
+          font-weight: bold;
+          margin-bottom: 8px;
+          font-family: &quot;Courier New&quot;, monospace;
+        "
+      >
+        Название
+      </div>
+      <div
+        id="item-tooltip-pos"
+        style="
+          color: #00fa9a;
+          font-size: 14px;
+          margin-bottom: 4px;
+          font-weight: bold;
+          font-family: &quot;Courier New&quot;, monospace;
+        "
+      >
+        +
+      </div>
+      <div
+        id="item-tooltip-neg"
+        style="
+          color: #ff4400;
+          font-size: 14px;
+          font-weight: bold;
+          font-family: &quot;Courier New&quot;, monospace;
+        "
+      >
+        -
+      </div>
+    </div>
+
+    <div
+      id="tutorial-overlay"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 50;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: &quot;Courier New&quot;, monospace;
+        pointer-events: auto;
+      "
+    >
+      <div
+        style="
+          background: var(--bg);
+          border: 2px solid var(--ind);
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 500px;
+          text-align: center;
+        "
+      >
+        <div
+          id="tutorial-title"
+          style="
+            font-weight: bold;
+            font-size: 24px;
+            margin-bottom: 16px;
+            color: var(--ind);
+          "
+        >
+          ОБУЧЕНИЕ
+        </div>
+        <div
+          id="tutorial-text"
+          style="font-size: 16px; margin-bottom: 24px; line-height: 1.5"
+        ></div>
+
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+          "
+        >
+          <button
+            id="btn-tutorial-prev"
+            style="
+              background: var(--bone);
+              color: #fff;
+              border: none;
+              padding: 10px 20px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+          >
+            НАЗАД
+          </button>
+          <div
+            id="tutorial-dots"
+            style="display: flex; align-items: center; gap: 8px"
+          ></div>
+          <button
+            id="btn-tutorial-next"
+            style="
+              background: var(--ind);
+              color: #1a1a1a;
+              border: none;
+              padding: 10px 20px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+          >
+            ДАЛЕЕ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="name-entry"
+      id="contracts-menu"
+      style="display: none; flex-direction: column"
+    >
+      <div
+        style="
+          background: #fff;
+          border: 2px solid var(--ind);
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 600px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        "
+      >
+        <div class="name-entry-title">КОНТРАКТЫ НА ЗАБЕГ</div>
+        <div style="text-align: center; font-size: 14px; color: #555">
+          Выберите 2 контракта. Выполненные контракты дают +15% осколков каждый.
+        </div>
+        <div
+          id="contracts-list"
+          style="display: flex; flex-direction: column; gap: 12px"
+        ></div>
+        <div
+          style="display: flex; justify-content: space-between; margin-top: 8px"
+        >
+          <button
+            id="btn-contracts-cancel"
+            style="
+              flex: 0.4;
+              background: #999;
+              color: #fff;
+              border: none;
+              padding: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+          >
+            ОТМЕНА
+          </button>
+          <button
+            id="btn-contracts-start"
+            style="
+              flex: 0.55;
+              background: var(--ind);
+              color: #1a1a1a;
+              border: none;
+              padding: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+            "
+            disabled
+          >
+            НАЧАТЬ (Выбрано 0/2)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="name-entry"
+      id="portal-ui"
+      style="
+        display: none;
+        flex-direction: column;
+        background: rgba(26, 26, 26, 0.7);
+      "
+    >
+      <div
+        style="
+          background: #fff;
+          border: 2px solid var(--cyan);
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90vw;
+          width: 400px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        "
+      >
+        <div class="name-entry-title" style="color: var(--cyan)">ПОРТАЛ</div>
+        <div style="text-align: center; font-size: 14px; color: #555">
+          Твоя мясорубка может закончиться здесь.
+        </div>
+        <div
+          style="
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 10px;
+          "
+        >
+          <button
+            id="btn-portal-descend"
+            style="
+              background: var(--cyan);
+              color: #1a1a1a;
+              border: none;
+              padding: 14px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 16px;
+            "
+          >
+            СПУСТИТЬСЯ (СЛЕД. ЭТАЖ)
+          </button>
+          <button
+            id="btn-portal-evac"
+            style="
+              background: var(--ind);
+              color: #1a1a1a;
+              border: none;
+              padding: 14px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 16px;
+            "
+          >
+            ЭВАКУАЦИЯ (+30% ОСКОЛКОВ)
+          </button>
+          <button
+            id="btn-portal-cancel"
+            style="
+              background: #999;
+              color: #fff;
+              border: none;
+              padding: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+              font-size: 14px;
+              margin-top: 8px;
+            "
+          >
+            ОТМЕНА
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
 </html>
