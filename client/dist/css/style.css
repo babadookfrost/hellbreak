@@ -1,0 +1,586 @@
+:root {
+  /* Core game color variables */
+  --bg: #f5f0e8;
+  --bone: #1a1a1a;
+  --blood: #d92638;
+  --ind: #e8a317;
+  --cyan: #0ea5c7;
+
+  /* State colors - Design System */
+  --state-available: #10b981;
+  --state-available-tint: rgba(16, 185, 129, 0.1);
+  --state-unavailable: #777777;
+  --state-unavailable-tint: rgba(119, 119, 119, 0.15);
+  --state-owned: #e8a317;
+  --state-owned-tint: rgba(232, 163, 23, 0.1);
+
+  /* Grid spacing - Design System */
+  --sp-sm: 8px;
+  --sp-md: 16px;
+  --sp-lg: 24px;
+
+  /* Layers (z-index) - Design System */
+  --z-canvas: 1;
+  --z-hud: 10;
+  --z-overlay: 100;
+  --z-tooltip: 200;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  font-family: "Courier New", monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--bone);
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  height: 100dvh;
+  width: 100dvw;
+  position: fixed;
+  inset: 0;
+}
+
+canvas {
+  display: block;
+  background: var(--bg);
+  cursor: crosshair;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--z-canvas);
+}
+
+/* Typography Scale */
+h1,
+.screen-title {
+  font-size: clamp(24px, 6vw, 32px);
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-align: center;
+  color: var(--bone);
+  text-transform: uppercase;
+}
+
+h2,
+.card-title {
+  font-size: clamp(16px, 4vw, 20px);
+  font-weight: bold;
+  color: var(--bone);
+}
+
+.text-body {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #333;
+}
+
+.text-small {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #666;
+}
+
+/* Universal Card Component */
+.universal-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-md);
+  border-radius: 8px;
+  border: 2px solid #ccc;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+}
+
+.universal-card:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+/* Color Coding States */
+.universal-card.available {
+  border-color: var(--state-available);
+  background: var(--state-available-tint);
+}
+
+.universal-card.unavailable {
+  border-color: var(--state-unavailable);
+  background: var(--state-unavailable-tint);
+  opacity: 0.65;
+}
+
+.universal-card.unavailable * {
+  color: #555 !important;
+}
+
+.universal-card.owned {
+  border-color: var(--state-owned);
+  background: var(--state-owned-tint);
+}
+
+/* Card layout details */
+.card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.card-icon {
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-action-btn {
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: bold;
+  padding: var(--sp-sm) var(--sp-md);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.1s ease;
+  margin-left: var(--sp-md);
+}
+
+.card-action-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.card-action-btn.available {
+  background: var(--state-available);
+  color: #fff;
+}
+
+.card-action-btn.unavailable {
+  background: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+
+/* Max badge style */
+.card-badge {
+  position: absolute;
+  top: var(--sp-sm);
+  right: var(--sp-sm);
+  background: var(--state-owned);
+  color: #1a1a1a;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 3px 6px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+/* Touch UI Layering */
+.touch-ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--z-hud);
+  display: none;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
+    env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+}
+@media (pointer: coarse) {
+  .touch-ui {
+    display: block;
+  }
+}
+
+.stick-base {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left, 14px));
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  width: clamp(90px, 16vw, 140px);
+  height: clamp(90px, 16vw, 140px);
+  background: rgba(200, 190, 170, 0.45);
+  border-radius: 50%;
+  pointer-events: none;
+  border: 2px solid rgba(200, 160, 80, 0.4);
+  touch-action: none;
+}
+
+.stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(32px, 9vw, 52px);
+  height: clamp(32px, 9vw, 52px);
+  margin: calc(clamp(32px, 9vw, 52px) / -2) 0 0
+    calc(clamp(32px, 9vw, 52px) / -2);
+  background: var(--ind);
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(200, 160, 50, 0.5);
+  pointer-events: none;
+}
+
+.btn {
+  position: absolute;
+  width: clamp(52px, 13vw, 76px);
+  height: clamp(52px, 13vw, 76px);
+  background: rgba(26, 26, 26, 0.75);
+  border: 2px solid var(--bone);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(16px, 4.5vw, 24px);
+  font-weight: bold;
+  pointer-events: auto;
+  touch-action: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active {
+  background: rgba(217, 38, 56, 0.65);
+  border-color: var(--blood);
+  transform: scale(0.9);
+}
+
+.btn-reload {
+  right: max(14px, env(safe-area-inset-right, 14px));
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+}
+
+.btn-dash {
+  right: calc(max(14px, env(safe-area-inset-right, 14px)) + clamp(58px, 14vw, 88px));
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  background: rgba(14, 165, 199, 0.15);
+  border-color: var(--cyan);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.btn-dash:active {
+  background: rgba(14, 165, 199, 0.45);
+}
+
+.btn-inventory {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right, 14px));
+  top: calc(max(14px, env(safe-area-inset-top, 14px)) + 140px + 70px);
+  width: 48px;
+  height: 48px;
+  background: rgba(26, 26, 26, 0.75);
+  border: 2px solid var(--bone);
+  color: #fff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  z-index: var(--z-hud);
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-inventory:active {
+  background: rgba(232, 163, 23, 0.45);
+}
+
+.btn-pause {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right, 14px));
+  top: calc(max(14px, env(safe-area-inset-top, 14px)) + 140px + 10px);
+  width: 48px;
+  height: 48px;
+  background: rgba(26, 26, 26, 0.75);
+  color: #fff;
+  border: 2px solid var(--bone);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  z-index: var(--z-hud);
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-pause:active {
+  background: rgba(26, 26, 26, 0.95);
+}
+
+/* Standardized HUD and Overlays */
+.name-entry {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 240, 232, 0.92);
+  z-index: var(--z-overlay);
+  overflow-y: auto;
+  padding: var(--sp-lg);
+}
+
+/* Clean Form Styling inside Overlays */
+.name-entry form,
+.menu-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  background: #fff;
+  border: 2px solid var(--ind);
+  padding: var(--sp-lg) calc(var(--sp-lg) * 1.5);
+  border-radius: 12px;
+  max-width: 90vw;
+  width: 500px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+}
+
+.name-entry-title {
+  color: var(--ind);
+  font-weight: bold;
+  font-size: clamp(20px, 5.5vw, 26px);
+  letter-spacing: 3px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.name-entry input {
+  font-family: "Courier New", monospace;
+  font-size: clamp(16px, 4.5vw, 20px);
+  padding: var(--sp-md);
+  background: #faf8f4;
+  border: 1px solid rgba(26, 26, 26, 0.3);
+  color: var(--bone);
+  border-radius: 6px;
+  text-transform: uppercase;
+  width: 100%;
+  text-align: center;
+  outline: none;
+}
+
+.name-entry input:focus {
+  border-color: var(--ind);
+  box-shadow: 0 0 12px rgba(232, 163, 23, 0.3);
+}
+
+.name-entry button,
+.std-btn {
+  font-family: "Courier New", monospace;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 12px var(--sp-lg);
+  background: var(--ind);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition:
+    transform 0.1s ease,
+    background-color 0.1s ease;
+}
+
+.name-entry button:active,
+.std-btn:active {
+  transform: scale(0.96);
+}
+
+.std-btn.secondary {
+  background: var(--bone);
+  color: #fff;
+}
+
+.std-btn.danger {
+  background: var(--blood);
+  color: #fff;
+}
+
+.std-btn.cyan-btn {
+  background: var(--cyan);
+  color: #fff;
+}
+
+.desktop-hints {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(26, 26, 26, 0.35);
+  font-size: 11px;
+  pointer-events: none;
+  z-index: var(--z-hud);
+  text-align: center;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .desktop-hints {
+    display: none;
+  }
+}
+
+@keyframes pulse {
+  from {
+    box-shadow: 0 0 4px var(--blood);
+    transform: scale(1);
+  }
+  to {
+    box-shadow: 0 0 14px var(--blood);
+    transform: scale(1.05);
+  }
+}
+
+/* HTML Main Menu Overlay */
+.main-menu-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #faf6f0, #f5f0e8);
+  z-index: var(--z-overlay);
+  overflow-y: auto;
+  padding: var(--sp-lg);
+}
+
+.main-menu-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-lg);
+  max-width: 600px;
+  width: 100%;
+  text-align: center;
+}
+
+.game-title {
+  font-size: clamp(32px, 8vw, 64px);
+  font-weight: bold;
+  color: var(--blood);
+  text-shadow: 0 0 20px rgba(217, 38, 56, 0.25);
+  letter-spacing: 4px;
+}
+
+.game-subtitle {
+  font-size: 14px;
+  color: #5a5a5a;
+  line-height: 1.5;
+}
+
+.start-buttons-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  width: 100%;
+}
+
+.menu-btn-primary {
+  font-size: 18px;
+  padding: 16px;
+  background: var(--blood);
+  color: #fff;
+  border: 2px solid var(--bone);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+  box-shadow: 0 4px 10px rgba(217, 38, 56, 0.2);
+}
+
+.menu-btn-primary:active {
+  transform: scale(0.97);
+}
+
+.menu-btn-daily {
+  font-size: 16px;
+  padding: 14px;
+  background: var(--cyan);
+  color: #fff;
+  border: 2px solid var(--bone);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.1s ease;
+}
+
+.menu-btn-daily:active {
+  transform: scale(0.97);
+}
+
+.menu-meta-shards {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--ind);
+  letter-spacing: 1px;
+}
+
+.leaderboard-box {
+  background: rgba(26, 26, 26, 0.04);
+  border: 1px solid rgba(26, 26, 26, 0.15);
+  border-radius: 8px;
+  padding: var(--sp-md);
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.leaderboard-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--bone);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.leaderboard-entry {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #5a5a5a;
+}
+
+.leaderboard-entry.top-1 {
+  color: var(--ind);
+  font-weight: bold;
+}
+
+.bottom-buttons-block {
+  display: flex;
+  gap: var(--sp-md);
+  width: 100%;
+}
+
+.bottom-buttons-block button {
+  flex: 1;
+}
