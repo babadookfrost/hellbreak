@@ -2066,6 +2066,52 @@ function drawWorldEntities() {
       ctx.fillStyle = e.isBoss ? "#d92638" : "#e8a317";
       ctx.fillRect(e.x - w / 2, e.y - e.r - 14, w * (e.hp / e.maxHp), 6);
     }
+
+    // Debug AI overlays
+    if (Game.aiDebugEnabled) {
+      // Draw target position or connections
+      ctx.strokeStyle = "rgba(0, 255, 200, 0.5)";
+      ctx.lineWidth = 1.5;
+      if (e.state === "COVER" && e.coverTile) {
+        ctx.strokeStyle = "rgba(0, 200, 255, 0.6)";
+        ctx.beginPath();
+        ctx.arc(e.coverTile.x, e.coverTile.y, 6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(e.coverTile.x, e.coverTile.y);
+        ctx.stroke();
+      } else if (e.state === "FLANK") {
+        ctx.strokeStyle = "rgba(255, 200, 0, 0.6)";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r + 5, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(Game.player.x, Game.player.y);
+        ctx.stroke();
+      }
+
+      // Draw cached path
+      if (e.path && e.path.length > 0) {
+        ctx.strokeStyle = "rgba(255, 0, 100, 0.6)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        for (let pIdx = e.pathIndex || 0; pIdx < e.path.length; pIdx++) {
+          ctx.lineTo(e.path[pIdx].x, e.path[pIdx].y);
+        }
+        ctx.stroke();
+      }
+
+      // Draw State text above enemy
+      ctx.fillStyle = "#00ffcc";
+      ctx.font = "bold 11px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${e.type.toUpperCase()}:${e.state}:${e.role || "NONE"}`, e.x, e.y - e.r - 22);
+    }
   }
 
   if (Game.portal) {
